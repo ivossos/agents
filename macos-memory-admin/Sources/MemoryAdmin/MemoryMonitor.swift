@@ -1,19 +1,20 @@
+import AppKit
 import Combine
 import Foundation
 
-/// Owns polling of system memory stats and the top-process list, and
-/// performs the admin-gated "purge memory" and "quit process" actions.
+/// Owns polling of system memory stats and the full process list, and
+/// performs the admin-gated "purge memory" action plus process
+/// start/stop actions for the GUI.
 final class MemoryMonitor: ObservableObject {
     static let shared = MemoryMonitor()
 
     @Published private(set) var stats: MemoryStats?
-    @Published private(set) var topProcesses: [ProcessMemoryInfo] = []
+    @Published private(set) var processes: [SystemProcess] = []
     @Published private(set) var lastUpdated = Date()
     @Published private(set) var isPurging = false
     @Published var lastError: String?
 
     private var refreshTimer: AnyCancellable?
-    private let processLimit = 8
 
     private init() {
         refresh()
@@ -24,7 +25,7 @@ final class MemoryMonitor: ObservableObject {
 
     func refresh() {
         stats = MemoryStats.current()
-        topProcesses = ProcessMemoryInfo.topProcesses(limit: processLimit)
+        processes = SystemProcess.snapshotAll()
         lastUpdated = Date()
     }
 
@@ -71,12 +72,35 @@ final class MemoryMonitor: ObservableObject {
         }
     }
 
-    /// Sends SIGTERM to the given process. Only succeeds for processes
-    /// owned by the current user; macOS returns EPERM otherwise.
+    /// Sends SIGTERM (a normal, cooperative "quit"). Only succeeds for
+    /// processes owned by the current user; macOS returns EPERM otherwise.
     func terminate(pid: Int32) {
-        if kill(pid, SIGTERM) != 0 {
-            lastError = "Couldn't quit PID \(pid): \(String(cString: strerror(errno)))"
+        signalProcess(pid: pid, signal: SIGTERM, verb: "quit")
+    }
+
+    /// Sends SIGKILL (an immediate, non-cooperative "force quit").
+    func forceTerminate(pid: Int32) {
+        signalProcess(pid: pid, signal: SIGKILL, verb: "force quit")
+    }
+
+    private func signalProcess(pid: Int32, signal: Int32, verb: String) {
+        if kill(pid, signal) != 0 {
+            lastError = "Couldn't \(verb) PID \(pid): \(String(cString: strerror(errno)))"
         }
         refresh()
+    }
+
+    /// Starts (launches) an application at the given URL, e.g. one picked
+    /// from an NSOpenPanel filtered to .app bundles.
+    func launchApplication(at url: URL) {
+        NSWorkspace.shared.openApplication(
+            at: url,
+            configuration: NSWorkspace.OpenConfiguration()
+        ) { [weak self] _, error in
+            guard let error else { return }
+            DispatchQueue.main.async {
+                self?.lastError = "Couldn't launch \(url.lastPathComponent): \(error.localizedDescription)"
+            }
+        }
     }
 }
