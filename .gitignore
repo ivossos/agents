@@ -12,3 +12,9 @@ Thumbs.db
 # IDE files
 .vscode/
 .idea/
+
+# Swift Package Manager / Xcode build artifacts
+.build/
+.swiftpm/
+DerivedData/
+*.xcodeproj
