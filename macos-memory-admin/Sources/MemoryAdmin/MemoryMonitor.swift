@@ -75,12 +75,25 @@ final class MemoryMonitor: ObservableObject {
     /// Sends SIGTERM (a normal, cooperative "quit"). Only succeeds for
     /// processes owned by the current user; macOS returns EPERM otherwise.
     func terminate(pid: Int32) {
+        guard !blockIfProtected(pid: pid) else { return }
         signalProcess(pid: pid, signal: SIGTERM, verb: "quit")
     }
 
     /// Sends SIGKILL (an immediate, non-cooperative "force quit").
     func forceTerminate(pid: Int32) {
+        guard !blockIfProtected(pid: pid) else { return }
         signalProcess(pid: pid, signal: SIGKILL, verb: "force quit")
+    }
+
+    /// Refuses to signal core OS processes, regardless of how the request
+    /// got here (button, context menu, multi-select). Returns true if the
+    /// pid was protected and the caller should stop.
+    private func blockIfProtected(pid: Int32) -> Bool {
+        guard let proc = processes.first(where: { $0.pid == pid }), proc.isSystemCritical else {
+            return false
+        }
+        lastError = "\(proc.name) is a core macOS process and is protected from being quit here."
+        return true
     }
 
     private func signalProcess(pid: Int32, signal: Int32, verb: String) {

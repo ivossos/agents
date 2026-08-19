@@ -6,6 +6,7 @@ struct ContentView: View {
     @State private var searchText = ""
     @State private var selection: Set<Int32> = []
     @State private var sortOrder = [KeyPathComparator(\SystemProcess.residentBytes, order: .reverse)]
+    @State private var showSystemProcesses = false
 
     private let byteFormatter: ByteCountFormatter = {
         let formatter = ByteCountFormatter()
@@ -15,12 +16,19 @@ struct ContentView: View {
     }()
 
     private var displayedProcesses: [SystemProcess] {
-        let filtered = searchText.isEmpty
-            ? monitor.processes
-            : monitor.processes.filter {
+        var result = showSystemProcesses ? monitor.processes : monitor.processes.filter { !$0.isSystemCritical }
+        if !searchText.isEmpty {
+            result = result.filter {
                 $0.name.localizedCaseInsensitiveContains(searchText) || String($0.pid) == searchText
             }
-        return filtered.sorted(using: sortOrder)
+        }
+        return result.sorted(using: sortOrder)
+    }
+
+    /// True if quitting the current selection would touch a protected OS process.
+    private var selectionIncludesProtected: Bool {
+        let selected = Set(selection)
+        return monitor.processes.contains { selected.contains($0.pid) && $0.isSystemCritical }
     }
 
     var body: some View {
@@ -69,7 +77,7 @@ struct ContentView: View {
                 } label: {
                     Label("Quit", systemImage: "xmark.circle")
                 }
-                .disabled(selection.isEmpty)
+                .disabled(selection.isEmpty || selectionIncludesProtected)
                 .help("Send SIGTERM to the selected process(es).")
 
                 Button(role: .destructive) {
@@ -77,8 +85,12 @@ struct ContentView: View {
                 } label: {
                     Label("Force Quit", systemImage: "exclamationmark.octagon")
                 }
-                .disabled(selection.isEmpty)
+                .disabled(selection.isEmpty || selectionIncludesProtected)
                 .help("Send SIGKILL to the selected process(es).")
+
+                Toggle("Show System Processes", isOn: $showSystemProcesses)
+                    .toggleStyle(.button)
+                    .help("Core macOS processes are hidden and protected from Quit by default.")
             }
         }
     }
@@ -106,7 +118,7 @@ struct ContentView: View {
                         statLabel("Compressed", stats.compressedBytes)
                         statLabel("Free", stats.freeBytes)
                         Spacer()
-                        Text("\(monitor.processes.count) processes")
+                        Text("\(displayedProcesses.count) of \(monitor.processes.count) processes")
                             .foregroundColor(.secondary)
                     }
                     .font(.caption)
@@ -129,7 +141,14 @@ struct ContentView: View {
     private var processTable: some View {
         Table(displayedProcesses, selection: $selection, sortOrder: $sortOrder) {
             TableColumn("Name", value: \.name) { proc in
-                Text(proc.name)
+                HStack(spacing: 4) {
+                    if proc.isSystemCritical {
+                        Image(systemName: "lock.fill")
+                            .foregroundColor(.secondary)
+                            .help("Protected macOS system process")
+                    }
+                    Text(proc.name)
+                }
             }
             TableColumn("PID", value: \.pid) { proc in
                 Text("\(proc.pid)")
@@ -149,8 +168,13 @@ struct ContentView: View {
             .width(120)
         }
         .contextMenu(forSelectionType: Int32.self) { pids in
-            Button("Quit") { pids.forEach { monitor.terminate(pid: $0) } }
-            Button("Force Quit", role: .destructive) { pids.forEach { monitor.forceTerminate(pid: $0) } }
+            let quittablePids = pids.filter { pid in
+                !(monitor.processes.first { $0.pid == pid }?.isSystemCritical ?? false)
+            }
+            Button("Quit") { quittablePids.forEach { monitor.terminate(pid: $0) } }
+                .disabled(quittablePids.isEmpty)
+            Button("Force Quit", role: .destructive) { quittablePids.forEach { monitor.forceTerminate(pid: $0) } }
+                .disabled(quittablePids.isEmpty)
         }
     }
 

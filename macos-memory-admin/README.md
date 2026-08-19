@@ -52,6 +52,27 @@ release `.app` you can move to `/Applications`.
   with administrator privileges`, so macOS prompts for an admin password;
   the app itself never runs elevated.
 
+### System process protection
+
+Core macOS processes (`kernel_task`, `launchd`, `WindowServer`,
+`loginwindow`, `Dock`, `Finder`, `SystemUIServer`, and other OS daemons —
+see `protectedNames` in `SystemProcess.swift`) plus anything owned by
+`root` or a system service account (`_`-prefixed user) are:
+
+- **hidden by default** from the table, so you're only looking at your own
+  apps and their helpers, not OS noise — toggle **Show System Processes**
+  to see them;
+- **marked with a lock icon** when shown;
+- **refused by Quit/Force Quit** even if selected, both in the UI and in
+  `MemoryMonitor` itself, so there's no path (button, context menu,
+  multi-select) that can accidentally kill one.
+
+This is deliberately conservative: it protects the processes that keep the
+OS itself running, not every Apple-authored background agent — anything
+not on that list (Spotlight indexing helpers, iCloud sync helpers, app
+updaters, browser/Electron helper processes, etc.) is left quittable,
+since those are normally exactly what's worth clearing out.
+
 ## How it works
 
 - **Memory stats** (`MemoryStats.swift`) come from the Mach kernel's
