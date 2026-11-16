@@ -6,7 +6,7 @@
 <title>Agents Control Center</title>
 <style>
 :root{--bg:#0b0e14;--panel:#121722;--panel2:#171d2b;--line:#222a3b;--text:#e6e9f0;--mute:#8a93a8;--accent:#f4a259;--ok:#4ade80;--warn:#fbbf24;--err:#f87171;--run:#60a5fa}
-:root[data-theme="light"]{--bg:#f3f4f7;--panel:#fff;--panel2:#f7f8fb;--line:#e1e4ec;--text:#161a24;--mute:#667086;--accent:#c4620d;--ok:#16a34a;--warn:#b7791f;--err:#dc2626;--run:#2563eb}
+:root[data-theme="light"]{--bg:#f6f7fa;--panel:#fff;--panel2:#f3f5f9;--line:#dde1ea;--text:#161a24;--mute:#667086;--accent:#c4620d;--ok:#16a34a;--warn:#b7791f;--err:#dc2626;--run:#2563eb}
 *{box-sizing:border-box;margin:0}
 body{background:var(--bg);color:var(--text);font:14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100vh}
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
@@ -67,9 +67,11 @@ select{background:var(--panel2);color:var(--text);border:1px solid var(--line);b
 .conn{font-size:12px;color:var(--mute)}
 .row2{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .chip{cursor:pointer;font:inherit}
+:root[data-theme="light"] .btn,:root[data-theme="light"] .logo{color:#fff}
 .hidden{display:none}
 .drawer.wide{width:min(760px,100%)}
 </style>
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('theme')||'light'}catch(e){document.documentElement.dataset.theme='light'}</script>
 </head>
 <body>
 <div class="app">
@@ -193,7 +195,7 @@ $('#q').oninput=e=>{q=e.target.value.toLowerCase();if(view!=='fleet'){view='flee
 document.addEventListener('keydown',e=>{const t=document.activeElement.tagName;if(e.key==='/'&&t!=='INPUT'&&t!=='TEXTAREA'){e.preventDefault();$('#q').focus()}if(e.key==='Escape')closeD()});
 $('#dispatchTop').onclick=()=>{drawer(`<button class="ghost" id="cl" style="float:right">Close</button><h2>Dispatch a task</h2><p>Choose the agent to send it to.</p><select id="pick" style="width:100%" aria-label="Agent">${agents.map(a=>`<option value="${esc(a.id)}">${esc(a.id)} — ${esc(cap(a.dept))}</option>`).join('')}</select><div class="row2" style="margin-top:12px"><button class="btn" id="go">Continue</button></div>`);
  $('#cl').onclick=closeD;$('#go').onclick=()=>{showAgent($('#pick').value).then(()=>$('#task')&&$('#task').focus())}};
-$('#theme').onclick=()=>{const r=document.documentElement;const dark=getComputedStyle(r).getPropertyValue('--bg').trim()==='#0b0e14';r.dataset.theme=dark?'light':'dark'};
+$('#theme').onclick=()=>{const r=document.documentElement;const dark=getComputedStyle(r).getPropertyValue('--bg').trim()==='#0b0e14';r.dataset.theme=dark?'light':'dark';try{localStorage.setItem('theme',r.dataset.theme)}catch(e){}};
 init();
 </script>
 <script src="workflows.js"></script>
