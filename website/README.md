@@ -42,6 +42,8 @@ Ready-made real-world examples are in `examples/workflows/` (`pre-release-qualit
 | `AGENTS_DIR` | repo root | Where agent folders live |
 | `WORKDIR` | `AGENTS_DIR` | Directory agents run in |
 | `MAX_PARALLEL` | `4` | Concurrent runs; extra runs queue |
+| `MAX_QUEUE` | `50` | Runs allowed to wait for a free slot. Beyond this, new runs/workflows get `429` with `Retry-After`. `-1` = unlimited |
+| `MAX_ACTIVE_WORKFLOWS` | `20` | Workflows running at once (each holds at most one queued step); beyond this, `429` |
 | `RUN_TIMEOUT_MIN` | `15` | Stop a run (and everything it spawned) after this many minutes; `0` disables |
 | `MAX_OUTPUT_KB` | `256` | Max output kept/streamed per run; the rest is dropped with a visible marker |
 | `KILL_GRACE_MS` | `5000` | Time between SIGTERM and SIGKILL when stopping a run |

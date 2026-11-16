@@ -11,6 +11,8 @@ const REPO = path.resolve(process.env.AGENTS_DIR || path.join(__dirname, '..'));
 const WORKDIR = path.resolve(process.env.WORKDIR || REPO); // where agents run
 const CLAUDE = process.env.CLAUDE_BIN || 'claude';
 const MAX_PARALLEL = +process.env.MAX_PARALLEL || 4;
+const MAX_QUEUE = process.env.MAX_QUEUE !== undefined ? +process.env.MAX_QUEUE : 50;   // runs allowed to wait for a slot; beyond this → 429
+const MAX_ACTIVE_WORKFLOWS = +process.env.MAX_ACTIVE_WORKFLOWS || 20;
 const RUN_TIMEOUT_MS = Math.round((process.env.RUN_TIMEOUT_MIN !== undefined ? +process.env.RUN_TIMEOUT_MIN : 15) * 60000); // 0 disables
 const MAX_OUTPUT = Math.round((+process.env.MAX_OUTPUT_KB || 256) * 1024);   // stored/streamed chars per run
 const KILL_GRACE_MS = +process.env.KILL_GRACE_MS || 5000;                    // SIGTERM → SIGKILL
@@ -215,7 +217,11 @@ function startWfRun(def, input) {
 }
 
 // ---------- http ----------
-const json = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
+const json = (res, code, obj, headers) => { res.writeHead(code, { 'Content-Type': 'application/json', ...(headers || {}) }); res.end(JSON.stringify(obj)); };
+// Back-pressure: refuse new work when the waiting queue is full (internal workflow steps are exempt; see MAX_ACTIVE_WORKFLOWS).
+const retryAfter = () => 10; // seconds; clients should back off at least this long
+const busy = (res, what) => json(res, 429, { error: `${what} is full (${queue.length} waiting, ${procs.size} running). Try again shortly.`, queued: queue.length, running: procs.size }, { 'Retry-After': String(retryAfter()) });
+const queueFull = () => MAX_QUEUE >= 0 && queue.length >= MAX_QUEUE;
 const body = req => new Promise((ok, no) => { let b = ''; req.on('data', d => { b += d; if (b.length > 1e5) { req.destroy(); no(new Error('too large')); } }); req.on('end', () => { try { ok(b ? JSON.parse(b) : {}); } catch (e) { no(e); } }); });
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml' };
 
@@ -236,7 +242,7 @@ http.createServer(async (req, res) => {
         res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
         res.write('retry: 2000\n\n'); clients.add(res); req.on('close', () => clients.delete(res)); return;
       }
-      if (p === '/api/config') return json(res, 200, { runTimeoutMs: RUN_TIMEOUT_MS, maxOutputKb: Math.round(MAX_OUTPUT / 1024), maxParallel: MAX_PARALLEL });
+      if (p === '/api/config') return json(res, 200, { runTimeoutMs: RUN_TIMEOUT_MS, maxOutputKb: Math.round(MAX_OUTPUT / 1024), maxParallel: MAX_PARALLEL, maxQueue: MAX_QUEUE, queued: queue.length, running: procs.size });
       if (p === '/api/agents' && req.method === 'GET') return json(res, 200, loadAgents().map(a => ({ ...a, prompt: undefined })));
       let m;
       if ((m = p.match(/^\/api\/agents\/([\w-]+)$/)) && req.method === 'GET') {
@@ -247,6 +253,7 @@ http.createServer(async (req, res) => {
         const b = await body(req);
         if (!loadAgents().some(a => a.id === b.agent)) return json(res, 400, { error: 'Unknown agent' });
         if (typeof b.task !== 'string' || !b.task.trim()) return json(res, 400, { error: 'Task is required' });
+        if (queueFull()) return busy(res, 'The run queue');
         const mode = MODES.includes(b.mode) ? b.mode : 'plan';
         return json(res, 201, brief(createRun(b.agent, b.task.trim().slice(0, 8000), mode)));
       }
@@ -288,6 +295,7 @@ http.createServer(async (req, res) => {
         if (typeof b.input !== 'string' || !b.input.trim()) return json(res, 400, { error: 'Input is required' });
         const known = new Set(loadAgents().map(a => a.id)), gone = def.steps.find(s => !known.has(s.agent));
         if (gone) return json(res, 400, { error: `Agent "${gone.agent}" no longer exists` });
+        if (wfActive.size >= MAX_ACTIVE_WORKFLOWS || queueFull()) return busy(res, 'The workflow queue');
         return json(res, 201, startWfRun({ ...def, mode: MODES.includes(b.mode) ? b.mode : def.mode }, b.input.trim().slice(0, 8000)));
       }
       if ((m = p.match(/^\/api\/wfruns\/(\w+)(\/cancel)?$/))) {
