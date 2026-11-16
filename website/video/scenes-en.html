@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Agents Control Center — vídeo de lançamento</title>
+<style>
+:root{--bg:#f6f7fa;--panel:#fff;--panel2:#f1f3f8;--line:#dde1ea;--ink:#161a24;--mute:#667086;--accent:#c4620d;--accent2:#f4a259;--ok:#16a34a;--run:#2563eb;--warn:#b7791f;--err:#dc2626}
+*{box-sizing:border-box;margin:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:var(--bg);font-family:Inter,'Helvetica Neue',Arial,sans-serif;color:var(--ink)}
+.mono{font-family:'DejaVu Sans Mono',ui-monospace,monospace}
+#stage{position:relative;width:1920px;height:1080px;overflow:hidden;background:
+ radial-gradient(1200px 700px at 85% -10%,#ffe9d2 0%,transparent 60%),radial-gradient(900px 600px at -10% 110%,#e6ecff 0%,transparent 60%),var(--bg)}
+.scene{position:absolute;inset:0;opacity:0}
+.cap{position:absolute;left:0;right:0;bottom:64px;text-align:center;font-size:38px;font-weight:600;color:var(--ink);padding:0 130px;line-height:1.3;letter-spacing:-.01em}
+.cap b{color:var(--accent)}
+.h1{font-size:92px;font-weight:800;letter-spacing:-.035em;line-height:1.02}
+.h2{font-size:64px;font-weight:750;letter-spacing:-.03em}
+.logo{display:inline-grid;place-items:center;width:120px;height:120px;border-radius:30px;background:var(--accent);color:#fff;font-weight:800;font-size:68px;box-shadow:0 24px 60px rgba(196,98,13,.35)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:22px;box-shadow:0 20px 60px rgba(30,40,70,.10)}
+.dot{display:inline-block;width:16px;height:16px;border-radius:50%;margin-right:12px;vertical-align:middle}
+.abs{position:absolute}
+.center{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.pill{display:inline-block;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:10px 22px;font-size:26px;font-weight:600;color:var(--mute)}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script>
+const D = [6.85, 5.57, 6.52];               // scene durations (s), narration length + padding
+const AGENTS = ["joker", "studio-coach", "brand-guardian", "ui-designer", "ux-researcher", "visual-storyteller", "whimsy-injector", "ai-engineer", "backend-architect", "devops-automator", "frontend-developer", "mobile-app-builder", "rapid-prototyper", "test-writer-fixer", "app-store-optimizer", "content-creator", "growth-hacker", "instagram-curator", "reddit-community-builder", "tiktok-strategist", "twitter-engager", "feedback-synthesizer", "sprint-prioritizer", "trend-researcher", "experiment-tracker", "project-shipper", "studio-producer", "analytics-reporter", "finance-tracker", "infrastructure-maintainer", "legal-compliance-checker", "support-responder", "api-tester", "performance-benchmarker", "test-results-analyzer", "tool-evaluator", "workflow-optimizer"]
+;             // real agent ids
+const FADE = 0.45;
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const E3=x=>1-Math.pow(1-clamp(x),3), E2=x=>{x=clamp(x);return x<.5?2*x*x:1-Math.pow(-2*x+2,2)/2}, BACK=x=>{x=clamp(x);const c=1.70158;return 1+(c+1)*Math.pow(x-1,3)+c*Math.pow(x-1,2)};
+const P=(t,s,d)=>clamp((t-s)/d);
+const starts=[];D.reduce((a,d,i)=>(starts[i]=a,a+d),0);
+const TOTAL=D.reduce((a,b)=>a+b,0);
+const stage=document.getElementById('stage');
+function el(tag,cls,html,style,parent){const e=document.createElement(tag);if(cls)e.className=cls;if(html!=null)e.innerHTML=html;if(style)Object.assign(e.style,style);(parent||stage).appendChild(e);return e}
+const tr=(e,x=0,y=0,s=1,o=1)=>{e.style.transform=`translate(${x}px,${y}px) scale(${s})`;e.style.opacity=o};
+const upd=[];                           // per-scene update fns
+const scenes=[];
+function scene(i,caption){const s=el('div','scene');scenes[i]=s;if(caption)el('div','cap',caption,null,s);return s}
+
+/* ---------- 1. silêncio ---------- */
+{const s=scene(0,'Your AI agents work in silence.');
+ const cap=s.querySelector('.cap');
+ const grid=el('div','abs',null,{left:'260px',top:'170px',width:'1400px',height:'480px'},s);
+ const cards=AGENTS.slice(0,32).map((n,k)=>{const c=el('div','card mono',n,{position:'absolute',width:'160px',height:'92px',left:(k%8)*176+'px',top:Math.floor(k/8)*118+'px',fontSize:'15px',color:'#9aa3b5',display:'flex',alignItems:'flex-end',padding:'12px',borderRadius:'16px',boxShadow:'none'},grid);return c});
+ const q=el('div','h1','What if you could see <span style="color:var(--accent)">everything</span>, in one place?',{position:'absolute',left:0,right:0,top:'730px',textAlign:'center',fontSize:'70px',opacity:0},s);
+ const frame=el('div','abs',null,{left:'236px',top:'146px',width:'1448px',height:'520px',border:'4px solid var(--accent)',borderRadius:'28px',opacity:0},s);
+ const cols=['#16a34a','#2563eb','#2563eb','#b7791f','#16a34a','#16a34a','#dc2626','#2563eb'];
+ upd[0]=lt=>{
+  tr(cap,0,0,1,P(lt,.2,.6)*(1-P(lt,2.5,.4)));cap.style.bottom='auto';cap.style.top='820px';
+  cards.forEach((c,k)=>{
+   const pulse=.5+.5*Math.sin(lt*2+k*.9);const lit=E3(P(lt,3.3+k*.05,.5));
+   c.style.borderColor=lit>0?cols[k%8]:'var(--line)';c.style.color=lit>0?'var(--ink)':'#9aa3b5';
+   c.style.opacity=(.35+.25*pulse)*(1-lit)+lit;c.style.background=lit>0?`color-mix(in srgb, ${cols[k%8]} ${Math.round(lit*10)}%, #fff)`:'#fff';
+   c.style.transform=`translateY(${(1-E3(P(lt,.1+k*.03,.6)))*40}px)`;});
+  q.style.opacity=P(lt,3.0,.7);q.style.transform=`translateY(${(1-E3(P(lt,3.0,.7)))*30}px)`;
+  frame.style.opacity=E3(P(lt,5.2,.7));frame.style.transform=`scale(${1.04-.04*E3(P(lt,5.2,.7))})`;
+ }}
+
+/* ---------- 2. apresentação ---------- */
+{const s=scene(1,'Meet <b>Agents Control Center</b>: the command panel for all your Claude agents.');
+ const lg=el('div','logo','C',{position:'absolute',left:'900px',top:'200px'},s);
+ const t1=el('div','h1','Agents Control Center',{position:'absolute',left:0,right:0,top:'380px',textAlign:'center',fontSize:'110px'},s);
+ const t2=el('div','h2','The command panel for your Claude agents',{position:'absolute',left:0,right:0,top:'520px',textAlign:'center',color:'var(--mute)',fontWeight:600,fontSize:'48px'},s);
+ const depts=['Design','Engineering','Marketing','Product','Project management','Studio operations','Testing','Bonus'];
+ const chips=depts.map(d=>el('div','pill',d,{position:'absolute',top:'680px'},s));
+ upd[1]=lt=>{
+  tr(lg,0,(1-BACK(P(lt,.1,.8)))*-120,BACK(P(lt,.1,.8)),P(lt,.1,.3));
+  tr(t1,0,(1-E3(P(lt,.6,.8)))*50,1,E3(P(lt,.6,.8)));
+  tr(t2,0,(1-E3(P(lt,1.4,.8)))*40,1,E3(P(lt,1.4,.8)));
+  chips.forEach((c,k)=>{const p=E3(P(lt,2.4+k*.1,.5));c.style.left=(150+(k%4)*440)+'px';c.style.top=(660+Math.floor(k/4)*86)+'px';c.style.opacity=p;c.style.transform=`translateY(${(1-p)*30}px)`;c.style.width='400px';c.style.textAlign='center'});
+ }}
+
+/* ---------- 7. encerramento ---------- */
+{const s=scene(2,null);
+ const lg=el('div','logo','C',{position:'absolute',left:'900px',top:'210px'},s);
+ const t1=el('div','h1','Agents Control Center',{position:'absolute',left:0,right:0,top:'390px',textAlign:'center',fontSize:'118px'},s);
+ const t2=el('div','h2','Real agents. <span style="color:var(--accent)">Real results.</span>',{position:'absolute',left:0,right:0,top:'560px',textAlign:'center',fontSize:'72px'},s);
+ const t3=el('div',null,'Available now',{position:'absolute',left:'710px',top:'730px',width:'500px',textAlign:'center',background:'var(--accent)',color:'#fff',fontWeight:800,fontSize:'44px',padding:'22px 0',borderRadius:'22px',boxShadow:'0 24px 60px rgba(196,98,13,.35)'},s);
+ upd[2]=lt=>{
+  tr(t2,0,(1-E3(P(lt,.2,.7)))*40,1,E3(P(lt,.2,.7)));
+  tr(lg,0,(1-BACK(P(lt,2.6,.7)))*-80,BACK(P(lt,2.6,.7)),P(lt,2.6,.3));
+  tr(t1,0,(1-E3(P(lt,2.8,.7)))*40,1,E3(P(lt,2.8,.7)));
+  const p=BACK(P(lt,4.5,.6));tr(t3,0,(1-p)*40,p,P(lt,4.5,.3));
+ }}
+
+window.TOTAL=TOTAL;window.D=D;window.starts=starts;
+window.setT=t=>{
+ scenes.forEach((s,i)=>{
+  const a=starts[i],b=a+D[i],lt=t-a;
+  let o=0;if(t>=a-FADE*0&&t<b+FADE){o=Math.min(P(t,a,FADE),1-P(t,b-FADE,FADE));if(i===0)o=Math.min(1,1-P(t,b-FADE,FADE)+0);if(i===D.length-1)o=P(t,a,FADE)}
+  s.style.opacity=clamp(o);s.style.visibility=o>0?'visible':'hidden';
+  if(o>0)upd[i](Math.max(0,lt));
+  const cap=s.querySelector('.cap');if(cap&&i!==0){cap.style.opacity=P(lt,.5,.5)*(1-P(t,b-FADE,FADE))}
+ });
+};
+setT(0);
+</script>
+</body>
+</html>

@@ -1,1 +1,7 @@
 data/*.json
+video/gui/raw.webm
+video/en/seg/
+video/en/cap/
+video/en/*.wav
+video/en/gui.mp4
+video/*.wav
