@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Atlas</title>
+<style>
+:root{--bg:#faf7f2;--card:#fffdf9;--ink:#1d1a16;--mute:#6f675c;--line:#e6dfd3;--accent:#c4552d;--soft:#f2ebdf}
+:root[data-theme="dark"]{--bg:#16130f;--card:#1e1a15;--ink:#f1ebe0;--mute:#a39a8b;--line:#322c24;--accent:#e8805a;--soft:#262019}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#16130f;--card:#1e1a15;--ink:#f1ebe0;--mute:#a39a8b;--line:#322c24;--accent:#e8805a;--soft:#262019}}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 ui-serif,Georgia,"Iowan Old Style",serif}
+.sans{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+header.nav{display:flex;justify-content:space-between;align-items:center;padding:20px 0;border-bottom:1px solid var(--line)}
+.nav b{font-size:18px;letter-spacing:.01em}.nav span{color:var(--accent)}
+.nav .r{display:flex;gap:16px;align-items:center;font-size:14px;color:var(--mute)}
+.hero{padding:64px 0 36px}
+.hero h1{font-size:clamp(36px,6vw,64px);line-height:1.04;font-weight:500;letter-spacing:-.02em;max-width:14ch}
+.hero h1 em{color:var(--accent)}
+.hero p{margin-top:18px;max-width:52ch;color:var(--mute);font-size:18px}
+.search{display:flex;gap:10px;margin-top:28px;flex-wrap:wrap}
+.search input{flex:1;min-width:220px;padding:14px 18px;border:1px solid var(--line);background:var(--card);border-radius:999px;font:15px ui-sans-serif,system-ui,sans-serif;color:var(--ink);outline-offset:2px}
+.pill{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 16px;border-radius:999px;cursor:pointer;font:14px ui-sans-serif,system-ui,sans-serif}
+.pill.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.filters{display:flex;gap:8px;flex-wrap:wrap;padding:20px 0 8px;position:sticky;top:0;background:var(--bg);z-index:2}
+.stats{display:flex;gap:36px;padding:8px 0 28px;flex-wrap:wrap}
+.stats div{font-size:13px;color:var(--mute)}.stats b{display:block;font-size:30px;color:var(--ink);font-weight:500}
+section.dept{padding:28px 0 8px;border-top:1px solid var(--line)}
+section.dept h2{font-size:26px;font-weight:500;display:flex;align-items:baseline;gap:12px}
+section.dept h2 small{font:13px ui-sans-serif,system-ui,sans-serif;color:var(--mute)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;padding:18px 0 26px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;cursor:pointer;text-align:left;transition:transform .15s,border-color .15s;color:var(--ink);font:inherit;display:flex;flex-direction:column;gap:10px}
+.card:hover{transform:translateY(-3px);border-color:var(--accent)}
+.avatar{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font:600 17px ui-sans-serif,system-ui,sans-serif;color:#fff}
+.card h3{font-size:18px;font-weight:600}
+.card p{font:14px/1.5 ui-sans-serif,system-ui,sans-serif;color:var(--mute);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.card .foot{margin-top:auto;font:12px ui-sans-serif,system-ui,sans-serif;color:var(--mute);display:flex;justify-content:space-between}
+dialog{border:1px solid var(--line);border-radius:20px;background:var(--card);color:var(--ink);padding:28px;max-width:560px;width:calc(100% - 32px)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog h2{font-size:28px;font-weight:500}
+dialog .sans{font-size:14px}
+dialog p{margin:14px 0;color:var(--mute)}
+.tag{display:inline-block;background:var(--soft);border-radius:6px;padding:2px 9px;margin:0 6px 6px 0;font:12px ui-monospace,monospace}
+.try{background:var(--soft);border-radius:12px;padding:14px;margin-top:16px;font:14px ui-sans-serif,system-ui,sans-serif}
+.try code{display:block;margin-top:6px;font:13px ui-monospace,monospace;color:var(--accent)}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:999px;padding:10px 20px;font:600 14px ui-sans-serif,system-ui,sans-serif;cursor:pointer;margin-top:16px}
+footer{padding:40px 0 60px;color:var(--mute);font:13px ui-sans-serif,system-ui,sans-serif;border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="nav sans"><b>Atlas<span>.</span></b><div class="r"><a style="color:inherit">Directory</a><a style="color:inherit">Playbooks</a><button class="pill" id="theme" aria-label="Toggle theme">Theme</button></div></header>
+<div class="hero">
+  <h1>Your studio of <em>specialist</em> agents.</h1>
+  <p>Browse every agent by department, read what it is for, and copy the prompt that puts it to work.</p>
+  <div class="search"><input id="q" placeholder="Search by role, skill or task — e.g. “onboarding flow”" aria-label="Search agents"></div>
+</div>
+<div class="stats" id="stats"></div>
+<div class="filters" id="filters"></div>
+<div id="content"></div>
+<footer>Agents Control Center · Atlas concept · agent data read from this repository.</footer>
+</div>
+<dialog id="dlg"></dialog>
+<script src="agents-data.js"></script>
+<script>
+const A=window.AGENTS,depts=[...new Set(A.map(a=>a.dept))];
+const cap=s=>s.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+const palette={magenta:'#b83280',red:'#c53030',blue:'#2b6cb0',green:'#2f855a',yellow:'#b7791f',purple:'#6b46c1',orange:'#c05621',pink:'#b83280',indigo:'#4c51bf',teal:'#2c7a7b',cyan:'#0987a0',gray:'#4a5568'};
+const col=c=>palette[c]||'#4a5568';
+const $=s=>document.querySelector(s);
+const nice=s=>{s=s.replace(/^(PROACTIVELY )?use this agent (when|for|to) ?/i,'');return s.charAt(0).toUpperCase()+s.slice(1)};
+let f='all',q='';
+function stats(){$('#stats').innerHTML=`<div><b>${A.length}</b>agents</div><div><b>${depts.length}</b>departments</div><div><b>${new Set(A.flatMap(a=>a.tools)).size}</b>distinct tools</div>`}
+function filters(){$('#filters').innerHTML=['all',...depts].map(d=>`<button class="pill ${f===d?'on':''}" data-d="${d}">${d==='all'?'All':cap(d)}</button>`).join('');
+ document.querySelectorAll('.filters .pill').forEach(b=>b.onclick=()=>{f=b.dataset.d;render()})}
+function content(){let h='';for(const d of depts){if(f!=='all'&&f!==d)continue;
+ const l=A.filter(a=>a.dept===d&&(!q||(a.id+a.desc).toLowerCase().includes(q)));if(!l.length)continue;
+ h+=`<section class="dept"><h2>${cap(d)} <small>${l.length} agent${l.length>1?'s':''}</small></h2><div class="cards">`+l.map(a=>`<button class="card" data-id="${a.id}"><div class="avatar" style="background:${col(a.color)}">${a.id[0].toUpperCase()}</div><h3>${cap(a.id)}</h3><p>${nice(a.desc)}</p><div class="foot"><span>${a.tools.length} tools</span><span>Open →</span></div></button>`).join('')+`</div></section>`}
+ $('#content').innerHTML=h||'<p style="padding:40px 0;color:var(--mute)">No agents match your search.</p>';
+ document.querySelectorAll('.card').forEach(c=>c.onclick=()=>show(c.dataset.id))}
+function show(id){const a=A.find(x=>x.id===id),d=$('#dlg');
+ d.innerHTML=`<div class="avatar" style="background:${col(a.color)};margin-bottom:14px">${a.id[0].toUpperCase()}</div><h2>${cap(a.id)}</h2><div class="sans" style="color:var(--mute)">${cap(a.dept)}</div><p>${a.desc}</p><div>${a.tools.map(t=>`<span class="tag">${t}</span>`).join('')}</div><div class="try"><b>Try it</b><code>Use the ${a.id} agent to …</code></div><button class="btn" onclick="document.getElementById('dlg').close()">Close</button>`;d.showModal()}
+function render(){filters();content()}
+$('#q').oninput=e=>{q=e.target.value.toLowerCase();content()};
+$('#theme').onclick=()=>{const r=document.documentElement,dark=getComputedStyle(r).getPropertyValue('--bg').trim()==='#16130f';r.dataset.theme=dark?'light':'dark'};
+$('#dlg').addEventListener('click',e=>{if(e.target===e.currentTarget)e.currentTarget.close()});
+stats();render();
+</script>
+</body>
+</html>

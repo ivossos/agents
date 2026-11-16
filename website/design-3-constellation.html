@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Constellation</title>
+<style>
+:root{--bg:#0d0b1a;--panel:#161330cc;--line:#2b2750;--text:#ece9ff;--mute:#9a95c4;--hub:#ffd479;--accent:#8b7bff}
+:root[data-theme="light"]{--bg:#f4f2ff;--panel:#ffffffd9;--line:#d8d3f5;--text:#1b1740;--mute:#625d93;--hub:#c98200;--accent:#5a45e0}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font:14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden;display:flex;flex-direction:column}
+.bar{display:flex;gap:12px;align-items:center;padding:12px 18px;flex-wrap:wrap;z-index:3}
+.bar h1{font-size:16px;font-weight:650;margin-right:auto;display:flex;gap:8px;align-items:center}
+.bar h1 i{width:10px;height:10px;border-radius:50%;background:var(--hub);box-shadow:0 0 14px var(--hub)}
+.bar input{background:var(--panel);border:1px solid var(--line);border-radius:999px;color:var(--text);padding:8px 14px;font:inherit;min-width:220px;outline-offset:2px}
+.btn{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:999px;padding:8px 14px;font:inherit;cursor:pointer}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.stage{flex:1;position:relative;min-height:0}
+svg{width:100%;height:100%;display:block}
+.link{stroke:var(--line);stroke-width:1.2;fill:none}
+.link.hot{stroke:var(--accent);stroke-width:2;stroke-dasharray:5 5;animation:d 1s linear infinite}
+@keyframes d{to{stroke-dashoffset:-20}}
+@media (prefers-reduced-motion:reduce){.link.hot{animation:none}.pulse{animation:none}}
+.node{cursor:pointer}
+.node circle.c{transition:r .15s}
+.node:hover circle.c,.node:focus circle.c{r:11}
+.node:focus{outline:none}.node:focus circle.ring{stroke-opacity:1}
+.node.dim{opacity:.18}
+.label{fill:var(--text);font-size:11px;pointer-events:none}
+.dlabel{fill:var(--mute);font-size:12px;font-weight:650;letter-spacing:.08em;text-transform:uppercase;pointer-events:none}
+.hubl{fill:var(--bg);font-weight:800;font-size:12px;pointer-events:none}
+.pulse{animation:pl 2.4s ease-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes pl{0%{transform:scale(.8);opacity:.7}100%{transform:scale(2.2);opacity:0}}
+.side{position:absolute;right:16px;top:8px;bottom:16px;width:min(340px,calc(100% - 32px));background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;backdrop-filter:blur(10px);overflow:auto;transform:translateX(calc(100% + 24px));transition:transform .2s}
+.side.open{transform:none}
+.side h2{font-size:18px}.side .m{color:var(--mute);margin:2px 0 12px}
+.tag{display:inline-block;border:1px solid var(--line);border-radius:6px;padding:2px 8px;font:12px ui-monospace,monospace;margin:0 4px 4px 0}
+.side textarea{width:100%;min-height:90px;background:transparent;border:1px solid var(--line);border-radius:10px;color:var(--text);padding:10px;font:inherit;margin:8px 0}
+.legend{position:absolute;left:18px;bottom:14px;color:var(--mute);font-size:12px;display:flex;gap:14px;flex-wrap:wrap}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}
+</style>
+</head>
+<body>
+<div class="bar">
+  <h1><i></i> Constellation</h1>
+  <input id="q" placeholder="Find an agent…" aria-label="Find an agent">
+  <button class="btn" id="fit">Reset view</button>
+  <button class="btn" id="theme" aria-label="Toggle theme">Theme</button>
+</div>
+<div class="stage" id="stage">
+  <svg id="svg" role="img" aria-label="Network of agents grouped by department"></svg>
+  <aside class="side" id="side" aria-live="polite"></aside>
+  <div class="legend"><span><i style="background:var(--hub)"></i>Orchestrator</span><span>Click a node to inspect · drag background to pan · scroll to zoom</span></div>
+</div>
+<script src="agents-data.js"></script>
+<script>
+const A=window.AGENTS,depts=[...new Set(A.map(a=>a.dept))];
+const cap=s=>s.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+const hues=[265,200,150,35,330,95,10,180];
+const $=s=>document.querySelector(s),NS='http://www.w3.org/2000/svg';
+const svg=$('#svg');let view={x:0,y:0,k:1},selected=null;
+const g=document.createElementNS(NS,'g');svg.appendChild(g);
+function el(t,at,p=g){const e=document.createElementNS(NS,t);for(const k in at)e.setAttribute(k,at[k]);p.appendChild(e);return e}
+const colour=d=>`hsl(${hues[depts.indexOf(d)%hues.length]} 80% 66%)`;
+function layout(){
+ g.innerHTML='';const R1=230,nodes=[];
+ const links=el('g',{});const dl=el('g',{});const nd=el('g',{});
+ el('circle',{cx:0,cy:0,r:62,fill:'none',stroke:'var(--line)','stroke-dasharray':'3 6'},links);
+ const hub=el('g',{class:'node',tabindex:0,role:'button','aria-label':'Orchestrator'},nd);
+ el('circle',{class:'pulse',r:30,fill:'var(--hub)',opacity:.4},hub);
+ el('circle',{class:'c',r:30,fill:'var(--hub)'},hub);
+ el('text',{class:'hubl','text-anchor':'middle',y:4},hub).textContent='ORCH';
+ hub.onclick=()=>info(null);
+ depts.forEach((d,i)=>{
+  const ang=i/depts.length*Math.PI*2-Math.PI/2,cx=Math.cos(ang)*R1,cy=Math.sin(ang)*R1;
+  const list=A.filter(a=>a.dept===d),c=colour(d);
+  el('path',{class:'link',d:`M0 0 L${cx} ${cy}`},links);
+  el('circle',{cx,cy,r:7,fill:c},nd);
+  const lx=Math.cos(ang)*(R1+ (list.length>6?150:110)),ly=Math.sin(ang)*(R1+(list.length>6?150:110));
+  const t=el('text',{class:'dlabel',x:cx*0.6,y:cy*0.6+4,'text-anchor':'middle'},dl);t.textContent=cap(d);
+  list.forEach((a,j)=>{
+   const sa=ang+(j-(list.length-1)/2)*(0.62/Math.max(list.length-1,3)),rr=R1+90+(j%3)*46;
+   const x=Math.cos(sa)*rr,y=Math.sin(sa)*rr;
+   el('path',{class:'link',d:`M${cx} ${cy} L${x} ${y}`,'data-a':a.id},links);
+   const n=el('g',{class:'node',tabindex:0,role:'button','aria-label':a.id,'data-id':a.id,transform:`translate(${x},${y})`},nd);
+   el('circle',{class:'ring',r:15,fill:'none',stroke:c,'stroke-opacity':0,'stroke-width':2},n);
+   el('circle',{class:'c',r:8,fill:c},n);
+   const right=Math.cos(sa)>=0;
+   const lab=el('text',{class:'label',x:right?14:-14,y:4,'text-anchor':right?'start':'end'},n);lab.textContent=a.id;
+   n.onclick=ev=>{ev.stopPropagation();info(a.id)};
+   n.onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();info(a.id)}};
+   nodes.push(n);
+  });
+ });
+ fit();
+}
+function apply(){g.setAttribute('transform',`translate(${view.x},${view.y}) scale(${view.k})`)}
+function fit(){const r=svg.getBoundingClientRect();view.k=Math.min(r.width/980,r.height/860);view.x=r.width/2;view.y=r.height/2;apply()}
+function info(id){
+ const s=$('#side');selected=id;
+ document.querySelectorAll('.link').forEach(l=>l.classList.toggle('hot',!!id&&l.dataset.a===id));
+ if(!id){s.innerHTML=`<h2>Orchestrator</h2><div class="m">Routes your task to the right specialist</div><textarea id="t" placeholder="Describe a task — e.g. “Launch a meditation app MVP this week”"></textarea><button class="btn pri" id="go">Route task</button><div id="out" class="m" style="margin-top:12px"></div>`;
+  $('#go').onclick=()=>{const w=($('#t').value||'').toLowerCase().split(/\W+/).filter(x=>x.length>3);
+   const sc=A.map(a=>[a,w.filter(x=>(a.id+a.desc).toLowerCase().includes(x)).length]).filter(x=>x[1]).sort((a,b)=>b[1]-a[1]).slice(0,3);
+   $('#out').innerHTML=sc.length?'Suggested: '+sc.map(x=>`<b>${x[0].id}</b>`).join(', '):'No obvious match — try more detail.';
+   const ids=sc.map(x=>x[0].id);document.querySelectorAll('.link').forEach(l=>l.classList.toggle('hot',ids.includes(l.dataset.a)))};
+  s.classList.add('open');return}
+ const a=A.find(x=>x.id===id);
+ s.innerHTML=`<button class="btn" style="float:right" id="x">Close</button><h2>${cap(a.id)}</h2><div class="m">${cap(a.dept)}</div><p style="margin-bottom:12px">${a.desc}</p><div>${a.tools.map(t=>`<span class="tag">${t}</span>`).join('')}</div><textarea placeholder="Task for ${a.id}…"></textarea><button class="btn pri">Dispatch</button>`;
+ $('#x').onclick=()=>{s.classList.remove('open');info_clear()};s.classList.add('open')}
+function info_clear(){document.querySelectorAll('.link.hot').forEach(l=>l.classList.remove('hot'))}
+$('#q').oninput=e=>{const v=e.target.value.toLowerCase();document.querySelectorAll('.node[data-id]').forEach(n=>{const a=A.find(x=>x.id===n.dataset.id);n.classList.toggle('dim',!!v&&!(a.id+a.desc).toLowerCase().includes(v))})};
+let drag=null;
+svg.onpointerdown=e=>{drag={x:e.clientX-view.x,y:e.clientY-view.y}};
+window.onpointermove=e=>{if(drag){view.x=e.clientX-drag.x;view.y=e.clientY-drag.y;apply()}};
+window.onpointerup=()=>drag=null;
+svg.onwheel=e=>{e.preventDefault();const k=Math.min(2.5,Math.max(.3,view.k*(e.deltaY<0?1.1:.9)));const r=svg.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;view.x=mx-(mx-view.x)*(k/view.k);view.y=my-(my-view.y)*(k/view.k);view.k=k;apply()};
+$('#fit').onclick=fit;window.onresize=fit;
+$('#theme').onclick=()=>{const r=document.documentElement,dark=getComputedStyle(r).getPropertyValue('--bg').trim()==='#0d0b1a';r.dataset.theme=dark?'light':'dark'};
+layout();
+</script>
+</body>
+</html>
