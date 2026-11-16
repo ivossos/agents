@@ -60,6 +60,9 @@ const clients = new Set();
 const emit = (type, data) => { const s = `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`; clients.forEach(c => c.write(s)); };
 const brief = r => ({ ...r, output: undefined, final: undefined, outputLen: (r.output || '').length });
 
+// Never hand the control-center's own secret to agent subprocesses.
+const childEnv = () => { const e = { ...process.env }; delete e.CONTROL_TOKEN; return e; };
+
 function pump() {
   while (procs.size < MAX_PARALLEL && queue.length) start(queue.shift());
 }
@@ -72,7 +75,7 @@ function start(run) {
   if (agent.tools.length) args.push('--allowedTools', agent.tools.join(','));
   run.status = 'running'; run.startedAt = Date.now(); emit('run', brief(run));
   let child;
-  try { child = spawn(CLAUDE, args, { cwd: WORKDIR, stdio: ['ignore', 'pipe', 'pipe'], env: process.env }); }
+  try { child = spawn(CLAUDE, args, { cwd: WORKDIR, stdio: ['ignore', 'pipe', 'pipe'], env: childEnv() }); }
   catch (e) { return finish(run, 'failed', e.message); }
   procs.set(run.id, child);
   let buf = '', err = '';
@@ -194,7 +197,10 @@ http.createServer(async (req, res) => {
   const host = (req.headers.host || '').replace(/:\d+$/, '');
   const localOK = ['localhost', '127.0.0.1', '[::1]'].includes(host) || process.env.ALLOW_ANY_HOST;
   if (!localOK) { res.writeHead(403); return res.end('Forbidden host'); }
-  if (req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) { res.writeHead(403); return res.end('Forbidden origin'); }
+  if (req.headers.origin) {
+    let oh = null; try { oh = new URL(req.headers.origin).host; } catch {}
+    if (oh !== req.headers.host) { res.writeHead(403); return res.end('Forbidden origin'); }
+  }
   if (p.startsWith('/api/')) {
     if (TOKEN && req.headers.authorization !== `Bearer ${TOKEN}` && u.searchParams.get('token') !== TOKEN) return json(res, 401, { error: 'Unauthorized' });
     try {
@@ -270,4 +276,6 @@ http.createServer(async (req, res) => {
   res.writeHead(200, { 'Content-Type': mime[path.extname(f)] || 'application/octet-stream' }); fs.createReadStream(f).pipe(res);
 }).listen(PORT, HOST, () => console.log(`Agents Control Center → http://${HOST}:${PORT}  (agents: ${REPO}, workdir: ${WORKDIR})`));
 
+process.on('unhandledRejection', e => console.error('unhandled rejection:', e));
+process.on('uncaughtException', e => console.error('uncaught exception:', e));
 process.on('SIGINT', () => { procs.forEach(c => c.kill()); process.exit(0); });
