@@ -21,7 +21,11 @@ const MODES = ['plan', 'acceptEdits', 'default'];
 function parseAgent(file, dept) {
   const t = fs.readFileSync(file, 'utf8');
   const m = t.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
-  if (!m) return null;
+  if (!m) {
+    // No frontmatter: derive the agent from the filename and the markdown body.
+    const para = (t.split(/^## Description\s*$/m)[1] || t).split(/\r?\n/).map(l => l.trim()).find(l => l && !l.startsWith('#'));
+    return { id: path.basename(file, '.md'), dept, desc: (para || '').slice(0, 400), color: 'gray', tools: [], prompt: t.trim(), file: path.relative(REPO, file) };
+  }
   const fm = {};
   m[1].split(/\r?\n/).forEach(l => { const k = l.match(/^(\w+):\s*(.*)$/); if (k) fm[k[1]] = k[2]; });
   if (!fm.name) return null;
@@ -221,6 +225,20 @@ http.createServer(async (req, res) => {
       if (p === '/api/workflows' && req.method === 'GET') return json(res, 200, workflows);
       if (p === '/api/workflows' && req.method === 'POST') {
         const w = cleanWorkflow(await body(req), crypto.randomBytes(4).toString('hex')); workflows.push(w); saveWf(); return json(res, 201, w);
+      }
+      if (p === '/api/workflows/import' && req.method === 'POST') {
+        const b = await body(req);
+        const d = b && b.data;
+        const list = Array.isArray(d) ? d : d && Array.isArray(d.workflows) ? d.workflows : d && d.workflow ? [d.workflow] : d && d.steps ? [d] : null;
+        if (!list || !list.length) return json(res, 400, { error: 'No workflows found in this file' });
+        if (list.length > 50) return json(res, 400, { error: 'Too many workflows (max 50 per import)' });
+        const imported = [], skipped = [];
+        list.forEach((x, i) => {
+          try { const w = cleanWorkflow(x, crypto.randomBytes(4).toString('hex')); workflows.push(w); imported.push({ id: w.id, name: w.name }); }
+          catch (e) { skipped.push({ name: (x && x.name) || `#${i + 1}`, reason: e.message }); }
+        });
+        if (imported.length) saveWf();
+        return json(res, 200, { imported, skipped });
       }
       if ((m = p.match(/^\/api\/workflows\/([\w-]+)$/))) {
         const i = workflows.findIndex(x => x.id === m[1]); if (i < 0) return json(res, 404, { error: 'Not found' });

@@ -1,0 +1,27 @@
+{
+  "format": "agents-control-center.workflow",
+  "version": 1,
+  "workflow": {
+    "name": "Customer feedback → next sprint",
+    "description": "Turn raw user feedback into prioritised work, an experiment plan and a resourcing view.",
+    "mode": "plan",
+    "steps": [
+      {
+        "agent": "feedback-synthesizer",
+        "prompt": "Synthesize the following raw customer feedback (reviews, support tickets, comments) into themes. For each theme give frequency, severity, representative quotes and the underlying user need.\n\n{{input}}"
+      },
+      {
+        "agent": "sprint-prioritizer",
+        "prompt": "From these feedback themes, build a prioritised backlog for a 6-day sprint. Score by impact vs effort, state what is explicitly cut, and name the one outcome the sprint must deliver.\n\n{{prev}}"
+      },
+      {
+        "agent": "experiment-tracker",
+        "prompt": "For the top 3 items in this backlog, design an experiment each: hypothesis, success metric, sample/duration and a kill criterion.\n\n{{prev}}"
+      },
+      {
+        "agent": "studio-producer",
+        "prompt": "Turn the sprint plan and experiments into a resourcing and schedule view: who does what by day, dependencies, and the biggest scheduling risk.\n\nSprint plan:\n{{step2}}\n\nExperiments:\n{{step3}}"
+      }
+    ]
+  }
+}

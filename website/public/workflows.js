@@ -27,16 +27,39 @@ function montage(steps, { selected, clickable } = {}) {
 // ---- workflows view ----
 window.wfRender = function () {
   const el = $('#viewWf'); if (!el) return;
-  el.innerHTML = `<div class="row2" style="margin-bottom:14px"><span class="conn" style="flex:1">Chain agents into a pipeline — each step's output feeds the next.</span><button class="btn" id="wfNew">New workflow</button></div>
+  el.innerHTML = `<div class="row2" style="margin-bottom:14px"><span class="conn" style="flex:1">Chain agents into a pipeline — each step's output feeds the next.</span><button class="ghost" id="wfImp">Import JSON</button><button class="ghost" id="wfExpAll" ${WF.length?'':'disabled'}>Export all</button><button class="btn" id="wfNew">New workflow</button><input type="file" id="wfFile" accept=".json,application/json" multiple hidden></div>
   <div class="wf-grid">${WF.map(w => `<section class="card wf-card"><div style="padding:14px"><div class="row2"><b style="flex:1;font-size:15px">${esc(w.name)}</b><span class="chip">${esc(w.mode)}</span></div>
     <p class="conn" style="margin:4px 0 12px">${esc(w.description)}</p>${montage(w.steps)}
-    <div class="row2" style="margin-top:14px"><button class="btn" data-run="${w.id}">Run</button><button class="ghost" data-edit="${w.id}">Edit</button></div></div></section>`).join('') || '<div class="card empty">No workflows yet.</div>'}</div>
+    <div class="row2" style="margin-top:14px"><button class="btn" data-run="${w.id}">Run</button><button class="ghost" data-edit="${w.id}">Edit</button><button class="ghost" data-exp="${w.id}" title="Download as JSON">Export</button></div></div></section>`).join('') || '<div class="card empty">No workflows yet.</div>'}</div>
   <section class="card" style="margin-top:16px"><header><span>Workflow runs</span></header><div style="overflow:auto"><table><thead><tr><th>Workflow</th><th>Input</th><th>Status</th><th class="hide-s">Steps</th><th class="hide-s">Started</th></tr></thead><tbody>${wfRuns.map(r => `<tr class="row" data-wr="${r.id}"><td><b>${esc(r.name)}</b></td><td>${esc(r.input.slice(0, 70))}</td><td><span class="dot ${wfStatusClass(r.status)}"></span>${r.status}</td><td class="hide-s">${r.steps.filter(s => s.status === 'done').length}/${r.steps.length}</td><td class="hide-s" style="color:var(--mute)">${wfAgo(r.createdAt)}</td></tr>`).join('') || '<tr><td colspan=5 class="empty">No runs yet.</td></tr>'}</tbody></table></div></section>`;
   $('#wfNew').onclick = () => builder();
+  $('#wfImp').onclick = () => $('#wfFile').click();
+  $('#wfFile').onchange = e => importFiles([...e.target.files]).finally(() => { e.target.value = ''; });
+  $('#wfExpAll').onclick = () => download('agents-workflows.json', { format: 'agents-control-center.workflows', version: 1, workflows: WF.map(clean) });
+  el.querySelectorAll('[data-exp]').forEach(b => b.onclick = () => { const w = WF.find(x => x.id === b.dataset.exp); download(slug(w.name) + '.json', { format: 'agents-control-center.workflow', version: 1, workflow: clean(w) }); });
   el.querySelectorAll('[data-run]').forEach(b => b.onclick = () => runForm(b.dataset.run));
   el.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => builder(b.dataset.edit));
   el.querySelectorAll('tr[data-wr]').forEach(r => r.onclick = () => monitor(r.dataset.wr));
 };
+
+// ---- import / export (JSON) ----
+const clean = w => ({ name: w.name, description: w.description, mode: w.mode, steps: w.steps.map(s => ({ agent: s.agent, prompt: s.prompt })) });
+const slug = s => (s || 'workflow').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'workflow';
+function download(name, obj) {
+  const a = document.createElement('a'), u = URL.createObjectURL(new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' }));
+  a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 1000);
+}
+async function importFiles(files) {
+  const done = [], bad = [];
+  for (const f of files) {
+    let data;
+    try { data = JSON.parse(await f.text()); } catch { bad.push(`${f.name}: not valid JSON`); continue; }
+    try { const r = await api('/workflows/import', { method: 'POST', body: JSON.stringify({ data }) }); r.imported.forEach(x => done.push(x.name)); r.skipped.forEach(x => bad.push(`${x.name}: ${x.reason}`)); }
+    catch (e) { bad.push(`${f.name}: ${e.message}`); }
+  }
+  await loadWf();
+  banner((done.length ? `Imported ${done.length}: ${done.join(', ')}. ` : '') + (bad.length ? `Skipped — ${bad.join('; ')}` : ''), !bad.length);
+}
 
 // ---- run form ----
 function runForm(id) {

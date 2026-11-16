@@ -19,6 +19,16 @@ Open **Workflows** in the sidebar. A workflow is an ordered chain of agents; eac
 
 Running one opens a live pipeline map: each step lights up as it runs, you can click a step to read its output (streaming while it works), and cancel the whole workflow. A failed step stops the chain and later steps are marked skipped. Workflow definitions are stored in `data/workflows.json`, runs in `data/wfruns.json` (both gitignored).
 
+### Import / export
+**Export** on a workflow card (or **Export all**) downloads JSON; **Import JSON** accepts one or several files — a single workflow, a bundle, or a plain array. Imported workflows get new ids; any that reference an unknown agent or are malformed are skipped with the reason shown. File shape:
+
+```json
+{ "format": "agents-control-center.workflow", "version": 1,
+  "workflow": { "name": "…", "description": "…", "mode": "plan",
+    "steps": [ { "agent": "api-tester", "prompt": "…{{input}}…" }, { "agent": "…", "prompt": "…{{prev}}…" } ] } }
+```
+Ready-made real-world examples are in `examples/workflows/` (`pre-release-quality-gate`, `feedback-to-sprint`, `feature-launch-kit`, or `all-three.json`).
+
 ## Safety defaults
 - Binds to `127.0.0.1` and rejects non-local `Host` and cross-site `Origin` requests.
 - Tasks default to **Read-only (plan)** permission mode; file edits must be chosen per run.

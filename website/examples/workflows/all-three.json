@@ -1,0 +1,75 @@
+{
+  "format": "agents-control-center.workflows",
+  "version": 1,
+  "workflows": [
+    {
+      "name": "Pre-release quality gate",
+      "description": "Before shipping a build: test the API, check performance, analyse results, then get a go/no-go call.",
+      "mode": "plan",
+      "steps": [
+        {
+          "agent": "api-tester",
+          "prompt": "We are about to release: {{input}}\n\nDesign and describe a focused API test plan for the endpoints most at risk (contract, auth, error handling, rate limits, edge cases). List the concrete test cases and what a failure would mean."
+        },
+        {
+          "agent": "performance-benchmarker",
+          "prompt": "Using this release scope and test plan, define the performance benchmarks to run (latency percentiles, throughput, memory, cold start) with pass/fail thresholds and the most likely bottlenecks.\n\nTest plan:\n{{prev}}"
+        },
+        {
+          "agent": "test-results-analyzer",
+          "prompt": "Combine the API test plan and performance benchmarks below into one risk analysis. Rank the top 5 risks by likelihood and impact, and say which checks must pass before release.\n\n{{step1}}\n\n{{step2}}"
+        },
+        {
+          "agent": "project-shipper",
+          "prompt": "Based on this risk analysis, write a go/no-go release recommendation: blocking issues, acceptable risks, a rollback plan, and a launch-day checklist.\n\n{{prev}}"
+        }
+      ]
+    },
+    {
+      "name": "Customer feedback → next sprint",
+      "description": "Turn raw user feedback into prioritised work, an experiment plan and a resourcing view.",
+      "mode": "plan",
+      "steps": [
+        {
+          "agent": "feedback-synthesizer",
+          "prompt": "Synthesize the following raw customer feedback (reviews, support tickets, comments) into themes. For each theme give frequency, severity, representative quotes and the underlying user need.\n\n{{input}}"
+        },
+        {
+          "agent": "sprint-prioritizer",
+          "prompt": "From these feedback themes, build a prioritised backlog for a 6-day sprint. Score by impact vs effort, state what is explicitly cut, and name the one outcome the sprint must deliver.\n\n{{prev}}"
+        },
+        {
+          "agent": "experiment-tracker",
+          "prompt": "For the top 3 items in this backlog, design an experiment each: hypothesis, success metric, sample/duration and a kill criterion.\n\n{{prev}}"
+        },
+        {
+          "agent": "studio-producer",
+          "prompt": "Turn the sprint plan and experiments into a resourcing and schedule view: who does what by day, dependencies, and the biggest scheduling risk.\n\nSprint plan:\n{{step2}}\n\nExperiments:\n{{step3}}"
+        }
+      ]
+    },
+    {
+      "name": "Feature launch kit",
+      "description": "Compliance check, store listing copy, launch article and growth plan for a new feature.",
+      "mode": "plan",
+      "steps": [
+        {
+          "agent": "legal-compliance-checker",
+          "prompt": "We are launching this feature: {{input}}\n\nList the legal and compliance considerations (privacy/data, consent, app store policy, advertising claims, accessibility, regional rules) and the exact wording or changes required before launch."
+        },
+        {
+          "agent": "app-store-optimizer",
+          "prompt": "Write the app store listing updates for this feature (title/subtitle options, keyword set, short and long description, 'What's new' text) while respecting these compliance constraints.\n\nFeature: {{input}}\n\nCompliance notes:\n{{prev}}"
+        },
+        {
+          "agent": "content-creator",
+          "prompt": "Write a ~400 word launch blog post for this feature in a clear, confident tone. Do not make claims that the compliance notes prohibit.\n\nFeature: {{input}}\n\nCompliance notes:\n{{step1}}"
+        },
+        {
+          "agent": "growth-hacker",
+          "prompt": "Create a 2-week launch growth plan: channels, one viral loop idea, a referral or in-app prompt, metrics to track daily and the decision rule for doubling down. Use this launch article as the core message.\n\n{{prev}}"
+        }
+      ]
+    }
+  ]
+}

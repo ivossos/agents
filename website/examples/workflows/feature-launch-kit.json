@@ -1,0 +1,27 @@
+{
+  "format": "agents-control-center.workflow",
+  "version": 1,
+  "workflow": {
+    "name": "Feature launch kit",
+    "description": "Compliance check, store listing copy, launch article and growth plan for a new feature.",
+    "mode": "plan",
+    "steps": [
+      {
+        "agent": "legal-compliance-checker",
+        "prompt": "We are launching this feature: {{input}}\n\nList the legal and compliance considerations (privacy/data, consent, app store policy, advertising claims, accessibility, regional rules) and the exact wording or changes required before launch."
+      },
+      {
+        "agent": "app-store-optimizer",
+        "prompt": "Write the app store listing updates for this feature (title/subtitle options, keyword set, short and long description, 'What's new' text) while respecting these compliance constraints.\n\nFeature: {{input}}\n\nCompliance notes:\n{{prev}}"
+      },
+      {
+        "agent": "content-creator",
+        "prompt": "Write a ~400 word launch blog post for this feature in a clear, confident tone. Do not make claims that the compliance notes prohibit.\n\nFeature: {{input}}\n\nCompliance notes:\n{{step1}}"
+      },
+      {
+        "agent": "growth-hacker",
+        "prompt": "Create a 2-week launch growth plan: channels, one viral loop idea, a referral or in-app prompt, metrics to track daily and the decision rule for doubling down. Use this launch article as the core message.\n\n{{prev}}"
+      }
+    ]
+  }
+}
