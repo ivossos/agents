@@ -68,6 +68,7 @@ select{background:var(--panel2);color:var(--text);border:1px solid var(--line);b
 .row2{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .chip{cursor:pointer;font:inherit}
 .hidden{display:none}
+.drawer.wide{width:min(760px,100%)}
 </style>
 </head>
 <body>
@@ -96,6 +97,7 @@ select{background:var(--panel2);color:var(--text);border:1px solid var(--line);b
       <div class="feed" id="feed"></div>
     </section>
   </div>
+  <div class="hidden" id="viewWf"></div>
   <section class="card hidden" id="viewRuns">
     <header><span>Run history</span></header>
     <div style="overflow:auto"><table><thead><tr><th>Agent</th><th>Task</th><th>Status</th><th class="hide-s">Mode</th><th class="hide-s">Duration</th><th class="hide-s">Started</th></tr></thead><tbody id="runRows"></tbody></table></div>
@@ -125,7 +127,7 @@ function statusOf(id){
 }
 const lastRun=id=>runs.find(r=>r.agent===id);
 function nav(){const depts=[...new Set(agents.map(a=>a.dept))];
- $('#nav').innerHTML=`<a class="${view==='fleet'&&dept==='all'?'on':''}" data-v="fleet" data-d="all">Overview <span class="n">${agents.length}</span></a><a class="${view==='runs'?'on':''}" data-v="runs">Run history <span class="n">${runs.length}</span></a><div class="h">Departments</div>`+depts.map(d=>`<a class="${view==='fleet'&&dept===d?'on':''}" data-v="fleet" data-d="${esc(d)}">${esc(cap(d))} <span class="n">${agents.filter(a=>a.dept===d).length}</span></a>`).join('');
+ $('#nav').innerHTML=`<a class="${view==='fleet'&&dept==='all'?'on':''}" data-v="fleet" data-d="all">Overview <span class="n">${agents.length}</span></a><a class="${view==='workflows'?'on':''}" data-v="workflows">Workflows <span class="n">${(window.WF||[]).length}</span></a><a class="${view==='runs'?'on':''}" data-v="runs">Run history <span class="n">${runs.length}</span></a><div class="h">Departments</div>`+depts.map(d=>`<a class="${view==='fleet'&&dept===d?'on':''}" data-v="fleet" data-d="${esc(d)}">${esc(cap(d))} <span class="n">${agents.filter(a=>a.dept===d).length}</span></a>`).join('');
  document.querySelectorAll('nav a').forEach(a=>a.onclick=()=>{view=a.dataset.v;if(a.dataset.d)dept=a.dataset.d;render()})}
 function kpis(){const st=agents.map(a=>statusOf(a.id)),c=s=>st.filter(x=>x===s).length;
  const today=runs.filter(r=>Date.now()-r.createdAt<86400e3).length;
@@ -141,11 +143,12 @@ function feed(){$('#feed').innerHTML=runs.slice(0,25).map(r=>`<div class="ev" st
 function runTable(){$('#runRows').innerHTML=runs.map(r=>`<tr class="row" data-r="${r.id}"><td><b class="mono">${esc(r.agent)}</b></td><td>${esc(r.task.slice(0,90))}</td><td><span class="dot ${r.status}"></span>${r.status}</td><td class="hide-s">${esc(r.mode)}</td><td class="hide-s">${r.startedAt?fmtD(dur(r)):'—'}</td><td class="hide-s" style="color:var(--mute)">${ago(r.createdAt)}</td></tr>`).join('')||'<tr><td colspan=6 class="empty">No runs yet.</td></tr>';
  document.querySelectorAll('#runRows tr[data-r]').forEach(t=>t.onclick=()=>showRun(t.dataset.r))}
 function render(){nav();kpis();chips();rows();feed();runTable();
- $('#viewFleet').classList.toggle('hidden',view!=='fleet');$('#viewRuns').classList.toggle('hidden',view!=='runs');
- $('#title').textContent=view==='runs'?'Run history':(dept==='all'?'Mission Control':cap(dept))}
+ if(window.wfRender)wfRender();
+ $('#viewFleet').classList.toggle('hidden',view!=='fleet');$('#viewRuns').classList.toggle('hidden',view!=='runs');$('#viewWf').classList.toggle('hidden',view!=='workflows');
+ $('#title').textContent=view==='workflows'?'Workflows':view==='runs'?'Run history':(dept==='all'?'Mission Control':cap(dept))}
 // ---- drawer ----
 function drawer(h){const d=$('#drawer');d.innerHTML=h;d.classList.add('open');d.setAttribute('aria-hidden','false')}
-function closeD(){openRun=null;openAgent=null;const d=$('#drawer');d.classList.remove('open');d.setAttribute('aria-hidden','true')}
+function closeD(){document.querySelector('#drawer').classList.remove('wide');window.wfClosed&&wfClosed();openRun=null;openAgent=null;const d=$('#drawer');d.classList.remove('open');d.setAttribute('aria-hidden','true')}
 async function showAgent(id){openRun=null;openAgent=id;
  let a;try{a=await api('/agents/'+id)}catch(e){return banner(e.message)}
  const s=statusOf(id),mine=runs.filter(r=>r.agent===id).slice(0,5);
@@ -172,6 +175,7 @@ function banner(m){const b=$('#errbar');b.textContent=m;b.classList.remove('hidd
 async function refreshRuns(){runs=await api('/runs');render()}
 function connect(){
  const es=new EventSource('/api/events'+(TOKEN?'?token='+encodeURIComponent(TOKEN):''));
+ window.es=es;window.dispatchEvent(new CustomEvent('es',{detail:es}));
  es.onopen=()=>{$('#conndot').className='dot done';$('#conntxt').textContent='live'};
  es.onerror=()=>{$('#conndot').className='dot failed';$('#conntxt').textContent='reconnecting…'};
  es.addEventListener('run',e=>{const r=JSON.parse(e.data),i=runs.findIndex(x=>x.id===r.id);
@@ -192,5 +196,6 @@ $('#dispatchTop').onclick=()=>{drawer(`<button class="ghost" id="cl" style="floa
 $('#theme').onclick=()=>{const r=document.documentElement;const dark=getComputedStyle(r).getPropertyValue('--bg').trim()==='#0b0e14';r.dataset.theme=dark?'light':'dark'};
 init();
 </script>
+<script src="workflows.js"></script>
 </body>
 </html>

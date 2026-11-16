@@ -47,14 +47,14 @@ let runs = [];
 try { runs = JSON.parse(fs.readFileSync(DATA, 'utf8')); } catch {}
 // Runs that were live when the server last stopped can't still be running.
 runs.forEach(r => { if (r.status === 'running' || r.status === 'queued') { r.status = 'failed'; r.error = 'Server restarted'; r.endedAt = Date.now(); } });
-const procs = new Map(), queue = [];
+const procs = new Map(), queue = [], waiters = new Map();
 let saveT;
 const save = () => { clearTimeout(saveT); saveT = setTimeout(() => {
   fs.mkdirSync(path.dirname(DATA), { recursive: true });
   fs.writeFileSync(DATA + '.tmp', JSON.stringify(runs.slice(-500))); fs.renameSync(DATA + '.tmp', DATA); }, 200); };
 const clients = new Set();
 const emit = (type, data) => { const s = `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`; clients.forEach(c => c.write(s)); };
-const brief = r => ({ ...r, output: undefined, outputLen: (r.output || '').length });
+const brief = r => ({ ...r, output: undefined, final: undefined, outputLen: (r.output || '').length });
 
 function pump() {
   while (procs.size < MAX_PARALLEL && queue.length) start(queue.shift());
@@ -80,7 +80,7 @@ function start(run) {
         else if (c.type === 'tool_use') { const t = `▸ ${c.name}\n`; run.output += t; emit('chunk', { id: run.id, text: t }); }
       }
     } else if (j.type === 'result') {
-      run.cost = j.total_cost_usd; run.isError = !!j.is_error;
+      run.cost = j.total_cost_usd; run.isError = !!j.is_error; if (typeof j.result === 'string') run.final = j.result;
       if (j.is_error && j.result) run.error = String(j.result).slice(0, 500);
     }
   };
@@ -97,11 +97,86 @@ function start(run) {
 function finish(run, status, error) {
   if (run.endedAt && run.status !== 'running') return;
   procs.delete(run.id); run.status = status; run.endedAt = Date.now(); if (error) run.error = error;
-  save(); emit('run', brief(run)); pump();
+  save(); emit('run', brief(run));
+  const w = waiters.get(run.id); if (w) { waiters.delete(run.id); w(run); }
+  pump();
 }
-function createRun(agent, task, mode) {
-  const run = { id: crypto.randomBytes(5).toString('hex'), agent, task, mode, status: 'queued', createdAt: Date.now(), output: '' };
+function createRun(agent, task, mode, meta) {
+  const run = { id: crypto.randomBytes(5).toString('hex'), agent, task, mode, status: 'queued', createdAt: Date.now(), output: '', ...(meta || {}) };
   runs.push(run); queue.push(run); save(); emit('run', brief(run)); pump(); return run;
+}
+
+function cancelRun(r) {
+  if (r.status === 'queued') { queue.splice(queue.indexOf(r), 1); finish(r, 'cancelled'); }
+  else if (r.status === 'running') { r.status = 'cancelled'; procs.get(r.id)?.kill('SIGTERM'); }
+}
+
+// ---------- workflows ----------
+const WF_FILE = path.join(__dirname, 'data', 'workflows.json'), WFR_FILE = path.join(__dirname, 'data', 'wfruns.json');
+const readJson = (f, d) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return d; } };
+const writeJson = (f, v) => { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f + '.tmp', JSON.stringify(v)); fs.renameSync(f + '.tmp', f); };
+const S = (agent, prompt) => ({ agent, prompt });
+let workflows = readJson(WF_FILE, null) || [
+  { id: 'idea-to-plan', name: 'Idea → sprint plan', description: 'Research a product idea, prioritise a 6-day scope, then outline the build.', mode: 'plan', steps: [
+    S('trend-researcher', 'Research current trends and opportunities relevant to this idea and summarise the strongest angles:\n\n{{input}}'),
+    S('sprint-prioritizer', 'Prioritise features for a 6-day sprint based on this research. Be explicit about what is cut.\n\n{{prev}}'),
+    S('rapid-prototyper', 'Write a concise implementation plan (no code) for this sprint scope:\n\n{{prev}}')] },
+  { id: 'design-review', name: 'Design review', description: 'User research, UI direction, then a brand consistency check.', mode: 'plan', steps: [
+    S('ux-researcher', 'Identify the key user needs and friction points for:\n\n{{input}}'),
+    S('ui-designer', 'Propose UI direction that addresses these findings:\n\n{{prev}}'),
+    S('brand-guardian', 'Review this UI direction for brand consistency and list concrete fixes:\n\n{{prev}}')] },
+  { id: 'launch-content', name: 'Launch content', description: 'Growth angles, long-form content, then social posts.', mode: 'plan', steps: [
+    S('growth-hacker', 'Suggest 3 growth angles for launching:\n\n{{input}}'),
+    S('content-creator', 'Write a short launch article using the strongest angle:\n\n{{prev}}'),
+    S('twitter-engager', 'Turn this article into a thread of 5 tweets:\n\n{{prev}}')] },
+].map(w => ({ ...w, steps: w.steps.map(x => ({ ...x })) }));
+let wfruns = readJson(WFR_FILE, []);
+wfruns.forEach(w => { if (w.status === 'running') { w.status = 'failed'; w.error = 'Server restarted'; w.endedAt = Date.now(); w.steps.forEach(s => { if (s.status === 'running' || s.status === 'pending') s.status = s.status === 'running' ? 'failed' : 'skipped'; }); } });
+const saveWf = () => writeJson(WF_FILE, workflows), saveWfr = () => writeJson(WFR_FILE, wfruns.slice(-200));
+const wfActive = new Map();
+const emitWf = w => { saveWfr(); emit('wfrun', w); };
+const tpl = (t, c) => t.replace(/\{\{\s*(input|prev|step(\d+))\s*\}\}/g, (_, k, n) => k === 'input' ? c.input : k === 'prev' ? c.prev : (c.steps[n - 1] || ''));
+const outputOf = r => (r.final || (r.output || '').split('\n').filter(l => !l.startsWith('▸ ')).join('\n')).trim();
+
+function cleanWorkflow(b, id) {
+  if (!b || typeof b.name !== 'string' || !b.name.trim() || b.name.length > 100) throw new Error('Name is required (max 100 chars)');
+  if (!Array.isArray(b.steps) || !b.steps.length || b.steps.length > 12) throw new Error('A workflow needs 1–12 steps');
+  const known = new Set(loadAgents().map(a => a.id));
+  const steps = b.steps.map((s, i) => {
+    if (!s || !known.has(s.agent)) throw new Error(`Step ${i + 1}: unknown agent`);
+    let p = typeof s.prompt === 'string' ? s.prompt.trim() : '';
+    if (p.length > 8000) throw new Error(`Step ${i + 1}: prompt too long`);
+    if (!p) p = i === 0 ? '{{input}}' : "Continue from the previous step's output:\n\n{{prev}}";
+    return { agent: s.agent, prompt: p };
+  });
+  return { id, name: b.name.trim(), description: String(b.description || '').slice(0, 300), mode: MODES.includes(b.mode) ? b.mode : 'plan', steps };
+}
+
+async function execWf(w) {
+  const ctl = { cancelled: false, runId: null }; wfActive.set(w.id, ctl);
+  w.status = 'running'; w.startedAt = Date.now(); emitWf(w);
+  const outs = []; let prev = w.input;
+  try {
+    for (let i = 0; i < w.steps.length && !ctl.cancelled; i++) {
+      const st = w.steps[i];
+      const run = createRun(st.agent, tpl(st.prompt, { input: w.input, prev, steps: outs }), w.mode, { wf: w.id, step: i });
+      st.runId = run.id; st.status = 'running'; st.startedAt = Date.now(); ctl.runId = run.id; emitWf(w);
+      const done = run.endedAt ? run : await new Promise(r => waiters.set(run.id, r));
+      st.endedAt = Date.now(); st.status = done.status; st.cost = done.cost;
+      if (done.status !== 'done') { w.error = `Step ${i + 1} (${st.agent}) ${done.status}${done.error ? ': ' + done.error : ''}`; break; }
+      prev = outputOf(done); outs.push(prev); st.output = prev.slice(0, 30000); emitWf(w);
+    }
+  } catch (e) { w.error = e.message; }
+  w.steps.forEach(s => { if (s.status === 'pending') s.status = 'skipped'; });
+  if (ctl.cancelled) delete w.error;
+  w.status = ctl.cancelled ? 'cancelled' : w.error ? 'failed' : 'done'; w.endedAt = Date.now();
+  w.cost = w.steps.reduce((a, s) => a + (s.cost || 0), 0);
+  wfActive.delete(w.id); emitWf(w);
+}
+function startWfRun(def, input) {
+  const w = { id: crypto.randomBytes(5).toString('hex'), workflowId: def.id, name: def.name, input, mode: def.mode, status: 'queued', createdAt: Date.now(),
+    steps: def.steps.map(s => ({ agent: s.agent, prompt: s.prompt, status: 'pending' })) };
+  wfruns.push(w); emitWf(w); execWf(w); return w;
 }
 
 // ---------- http ----------
@@ -141,9 +216,33 @@ http.createServer(async (req, res) => {
       }
       if ((m = p.match(/^\/api\/runs\/(\w+)\/cancel$/)) && req.method === 'POST') {
         const r = runs.find(x => x.id === m[1]); if (!r) return json(res, 404, { error: 'Not found' });
-        if (r.status === 'queued') { queue.splice(queue.indexOf(r), 1); finish(r, 'cancelled'); }
-        else if (r.status === 'running') { r.status = 'cancelled'; procs.get(r.id)?.kill('SIGTERM'); }
-        return json(res, 200, brief(r));
+        cancelRun(r); return json(res, 200, brief(r));
+      }
+      if (p === '/api/workflows' && req.method === 'GET') return json(res, 200, workflows);
+      if (p === '/api/workflows' && req.method === 'POST') {
+        const w = cleanWorkflow(await body(req), crypto.randomBytes(4).toString('hex')); workflows.push(w); saveWf(); return json(res, 201, w);
+      }
+      if ((m = p.match(/^\/api\/workflows\/([\w-]+)$/))) {
+        const i = workflows.findIndex(x => x.id === m[1]); if (i < 0) return json(res, 404, { error: 'Not found' });
+        if (req.method === 'PUT') { workflows[i] = cleanWorkflow(await body(req), m[1]); saveWf(); return json(res, 200, workflows[i]); }
+        if (req.method === 'DELETE') { workflows.splice(i, 1); saveWf(); return json(res, 200, { ok: true }); }
+        return json(res, 200, workflows[i]);
+      }
+      if (p === '/api/wfruns' && req.method === 'GET') return json(res, 200, wfruns.slice(-100).reverse());
+      if (p === '/api/wfruns' && req.method === 'POST') {
+        const b = await body(req), def = workflows.find(x => x.id === b.workflow);
+        if (!def) return json(res, 400, { error: 'Unknown workflow' });
+        if (typeof b.input !== 'string' || !b.input.trim()) return json(res, 400, { error: 'Input is required' });
+        const known = new Set(loadAgents().map(a => a.id)), gone = def.steps.find(s => !known.has(s.agent));
+        if (gone) return json(res, 400, { error: `Agent "${gone.agent}" no longer exists` });
+        return json(res, 201, startWfRun({ ...def, mode: MODES.includes(b.mode) ? b.mode : def.mode }, b.input.trim().slice(0, 8000)));
+      }
+      if ((m = p.match(/^\/api\/wfruns\/(\w+)(\/cancel)?$/))) {
+        const w = wfruns.find(x => x.id === m[1]); if (!w) return json(res, 404, { error: 'Not found' });
+        if (m[2] && req.method === 'POST') {
+          const c = wfActive.get(w.id); if (c) { c.cancelled = true; const r = runs.find(x => x.id === c.runId); if (r) cancelRun(r); }
+        }
+        return json(res, 200, w);
       }
       return json(res, 404, { error: 'Not found' });
     } catch (e) { return json(res, 400, { error: e.message }); }

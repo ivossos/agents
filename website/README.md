@@ -14,6 +14,11 @@ npm start        # http://127.0.0.1:3000
 - **Status, KPIs, activity**: derived from actual runs (running / queued / failed / done within the last hour / idle). History is saved to `data/runs.json` (gitignored).
 - **Cancel** stops a running or queued task.
 
+## Workflows
+Open **Workflows** in the sidebar. A workflow is an ordered chain of agents; each step's prompt can use `{{input}}` (what you typed when running it), `{{prev}}` (the previous step's output) or `{{step1}}`, `{{step2}}`… Three starters are included (idea → sprint plan, design review, launch content), and you can build, edit and delete your own.
+
+Running one opens a live pipeline map: each step lights up as it runs, you can click a step to read its output (streaming while it works), and cancel the whole workflow. A failed step stops the chain and later steps are marked skipped. Workflow definitions are stored in `data/workflows.json`, runs in `data/wfruns.json` (both gitignored).
+
 ## Safety defaults
 - Binds to `127.0.0.1` and rejects non-local `Host` and cross-site `Origin` requests.
 - Tasks default to **Read-only (plan)** permission mode; file edits must be chosen per run.
