@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agents Control Center</title>
+<style>
+:root{--bg:#0b0e14;--panel:#121722;--panel2:#171d2b;--line:#222a3b;--text:#e6e9f0;--mute:#8a93a8;--accent:#f4a259;--ok:#4ade80;--warn:#fbbf24;--err:#f87171;--run:#60a5fa}
+:root[data-theme="light"]{--bg:#f3f4f7;--panel:#fff;--panel2:#f7f8fb;--line:#e1e4ec;--text:#161a24;--mute:#667086;--accent:#c4620d;--ok:#16a34a;--warn:#b7791f;--err:#dc2626;--run:#2563eb}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--text);font:14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100vh}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+aside{background:var(--panel);border-right:1px solid var(--line);padding:16px 12px;position:sticky;top:0;height:100vh;overflow:auto}
+.brand{display:flex;gap:10px;align-items:center;padding:4px 8px 16px;font-weight:700;letter-spacing:.02em}
+.logo{width:26px;height:26px;border-radius:7px;background:var(--accent);display:grid;place-items:center;color:#0b0e14;font-weight:800}
+nav a{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-radius:8px;color:var(--mute);text-decoration:none;cursor:pointer;font-size:13px}
+nav a:hover{background:var(--panel2);color:var(--text)}
+nav a.on{background:var(--panel2);color:var(--text);box-shadow:inset 2px 0 var(--accent)}
+nav .h{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute);padding:14px 10px 6px}
+nav .n{font-size:11px;color:var(--mute)}
+main{padding:20px 24px 40px;min-width:0}
+.top{display:flex;gap:12px;align-items:center;margin-bottom:18px;flex-wrap:wrap}
+.top h1{font-size:20px;font-weight:650}
+.cmd{flex:1;min-width:240px;display:flex;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:0 12px;align-items:center}
+.cmd input{flex:1;background:none;border:0;color:var(--text);padding:10px 0;font:inherit;outline:none}
+.cmd kbd{font-size:11px;color:var(--mute);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+button{font:inherit;cursor:pointer}
+.btn{background:var(--accent);color:#0b0e14;border:0;border-radius:9px;padding:9px 14px;font-weight:650}
+.ghost{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:9px;padding:8px 12px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.kpi .l{color:var(--mute);font-size:12px}.kpi .v{font-size:26px;font-weight:650;margin-top:2px}
+.kpi .s{font-size:12px;color:var(--mute)}
+.grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(280px,1fr);gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.card>header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line);font-weight:600}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--panel2);color:var(--mute);border-radius:999px;padding:3px 10px;font-size:12px}
+.chip.on{color:var(--text);border-color:var(--accent)}
+table{width:100%;border-collapse:collapse}
+th{font-weight:500;color:var(--mute);text-align:left;font-size:12px;padding:8px 14px;border-bottom:1px solid var(--line)}
+td{padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr.row{cursor:pointer}tr.row:hover td{background:var(--panel2)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px}
+.running{background:var(--run);box-shadow:0 0 0 0 var(--run);animation:p 1.8s infinite}
+.idle{background:var(--mute)}.done{background:var(--ok)}.blocked{background:var(--err)}.queued{background:var(--warn)}
+@keyframes p{70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+@media (prefers-reduced-motion:reduce){.running{animation:none}}
+.bar{height:5px;background:var(--line);border-radius:3px;width:90px}.bar i{display:block;height:100%;border-radius:3px;background:var(--accent)}
+.feed{max-height:480px;overflow:auto}
+.ev{display:flex;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:13px}
+.ev time{color:var(--mute);font-size:11px;min-width:42px;padding-top:2px}
+.ev b{font-weight:600}
+.drawer{position:fixed;right:0;top:0;bottom:0;width:min(420px,100%);background:var(--panel);border-left:1px solid var(--line);transform:translateX(100%);transition:transform .2s;padding:20px;overflow:auto;z-index:5}
+.drawer.open{transform:none}
+.drawer h2{font-size:18px}.drawer p{color:var(--mute);margin:10px 0}
+.tag{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:2px 8px;font-size:12px;margin:0 4px 4px 0}
+textarea{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:10px;font:inherit;min-height:84px;margin:8px 0}
+@media (max-width:900px){.app{grid-template-columns:1fr}aside{position:static;height:auto;display:none}.grid{grid-template-columns:1fr}main{padding:16px}.hide-s{display:none}}
+
+.pre{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;white-space:pre-wrap;word-break:break-word;font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;max-height:50vh;overflow:auto;margin:8px 0}
+select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:inherit}
+.failed{background:var(--err)}.cancelled{background:var(--mute)}
+.err{color:var(--err);font-size:13px;margin:6px 0}
+.empty{padding:24px 14px;color:var(--mute)}
+.conn{font-size:12px;color:var(--mute)}
+.row2{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chip{cursor:pointer;font:inherit}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="app">
+<aside>
+  <div class="brand"><div class="logo">C</div> Agents Control</div>
+  <nav id="nav"></nav>
+  <div class="conn" style="padding:16px 10px"><span class="dot idle" id="conndot"></span><span id="conntxt">connecting…</span></div>
+</aside>
+<main>
+  <div class="top">
+    <h1 id="title">Mission Control</h1>
+    <label class="cmd"><span class="mono" style="color:var(--accent)">›</span><input id="q" placeholder="Search agents…" aria-label="Search agents"><kbd>/</kbd></label>
+    <button class="ghost" id="theme" aria-label="Toggle theme">Theme</button>
+    <button class="btn" id="dispatchTop">Dispatch task</button>
+  </div>
+  <div id="errbar" class="err hidden"></div>
+  <section class="kpis" id="kpis"></section>
+  <div class="grid" id="viewFleet">
+    <section class="card">
+      <header><span>Fleet</span><div class="chips" id="chips"></div></header>
+      <div style="overflow:auto"><table><thead><tr><th>Agent</th><th class="hide-s">Department</th><th>Status</th><th class="hide-s">Runs</th><th class="hide-s">Last run</th></tr></thead><tbody id="rows"></tbody></table></div>
+    </section>
+    <section class="card">
+      <header><span>Live activity</span></header>
+      <div class="feed" id="feed"></div>
+    </section>
+  </div>
+  <section class="card hidden" id="viewRuns">
+    <header><span>Run history</span></header>
+    <div style="overflow:auto"><table><thead><tr><th>Agent</th><th>Task</th><th>Status</th><th class="hide-s">Mode</th><th class="hide-s">Duration</th><th class="hide-s">Started</th></tr></thead><tbody id="runRows"></tbody></table></div>
+  </section>
+</main>
+</div>
+<aside class="drawer" id="drawer" aria-hidden="true"></aside>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const cap=s=>s.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+const TOKEN=new URLSearchParams(location.search).get('token')||'';
+const api=async(p,o={})=>{const r=await fetch('/api'+p,{...o,headers:{'Content-Type':'application/json',...(TOKEN?{Authorization:'Bearer '+TOKEN}:{})}});
+  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.statusText);return j};
+let agents=[],runs=[],dept='all',view='fleet',q='',stat='all',openRun=null,openAgent=null;
+const ago=t=>{if(!t)return'never';const s=Math.max(0,(Date.now()-t)/1000|0);return s<60?s+'s ago':s<3600?(s/60|0)+'m ago':s<86400?(s/3600|0)+'h ago':(s/86400|0)+'d ago'};
+const dur=r=>r.startedAt?((r.endedAt||Date.now())-r.startedAt)/1000|0:0;
+const fmtD=s=>s<60?s+'s':(s/60|0)+'m '+(s%60)+'s';
+function statusOf(id){
+  const mine=runs.filter(r=>r.agent===id);
+  if(mine.some(r=>r.status==='running'))return'running';
+  if(mine.some(r=>r.status==='queued'))return'queued';
+  const last=mine.find(r=>r.status!=='cancelled');   // runs are newest-first
+  if(last&&last.status==='failed')return'failed';
+  if(last&&last.status==='done'&&Date.now()-last.endedAt<3600e3)return'done';
+  return'idle';
+}
+const lastRun=id=>runs.find(r=>r.agent===id);
+function nav(){const depts=[...new Set(agents.map(a=>a.dept))];
+ $('#nav').innerHTML=`<a class="${view==='fleet'&&dept==='all'?'on':''}" data-v="fleet" data-d="all">Overview <span class="n">${agents.length}</span></a><a class="${view==='runs'?'on':''}" data-v="runs">Run history <span class="n">${runs.length}</span></a><div class="h">Departments</div>`+depts.map(d=>`<a class="${view==='fleet'&&dept===d?'on':''}" data-v="fleet" data-d="${esc(d)}">${esc(cap(d))} <span class="n">${agents.filter(a=>a.dept===d).length}</span></a>`).join('');
+ document.querySelectorAll('nav a').forEach(a=>a.onclick=()=>{view=a.dataset.v;if(a.dataset.d)dept=a.dataset.d;render()})}
+function kpis(){const st=agents.map(a=>statusOf(a.id)),c=s=>st.filter(x=>x===s).length;
+ const today=runs.filter(r=>Date.now()-r.createdAt<86400e3).length;
+ const cost=runs.filter(r=>Date.now()-r.createdAt<86400e3).reduce((s,r)=>s+(r.cost||0),0);
+ $('#kpis').innerHTML=[['Agents',agents.length,new Set(agents.map(a=>a.dept)).size+' departments'],['Running',c('running'),'active now'],['Queued',c('queued'),'waiting for a slot'],['Failed',c('failed'),'last run errored'],['Runs (24h)',today,'$'+cost.toFixed(2)+' spent']].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="s">${k[2]}</div></div>`).join('')}
+function chips(){$('#chips').innerHTML=['all','running','queued','failed','done','idle'].map(s=>`<button class="chip ${stat===s?'on':''}" data-s="${s}">${s}</button>`).join('');
+ document.querySelectorAll('#chips .chip').forEach(b=>b.onclick=()=>{stat=b.dataset.s;rows();chips()})}
+function rows(){const list=agents.filter(a=>(dept==='all'||a.dept===dept)&&(stat==='all'||statusOf(a.id)===stat)&&(!q||(a.id+a.desc+a.dept).toLowerCase().includes(q)));
+ $('#rows').innerHTML=list.map(a=>{const s=statusOf(a.id),l=lastRun(a.id);return`<tr class="row" data-id="${esc(a.id)}"><td><b class="mono">${esc(a.id)}</b></td><td class="hide-s">${esc(cap(a.dept))}</td><td><span class="dot ${s}"></span>${s}</td><td class="hide-s">${runs.filter(r=>r.agent===a.id).length}</td><td class="hide-s" style="color:var(--mute)">${l?ago(l.createdAt):'never'}</td></tr>`}).join('')||'<tr><td colspan=5 class="empty">No agents match.</td></tr>';
+ document.querySelectorAll('tr.row').forEach(r=>r.onclick=()=>showAgent(r.dataset.id))}
+function feed(){$('#feed').innerHTML=runs.slice(0,25).map(r=>`<div class="ev" style="cursor:pointer" data-r="${r.id}"><time class="mono">${ago(r.createdAt).replace(' ago','')}</time><div><span class="dot ${r.status}"></span><b class="mono">${esc(r.agent)}</b> ${r.status} — ${esc(r.task.slice(0,80))}</div></div>`).join('')||'<div class="empty">No runs yet. Dispatch a task to get started.</div>';
+ document.querySelectorAll('#feed .ev[data-r]').forEach(e=>e.onclick=()=>showRun(e.dataset.r))}
+function runTable(){$('#runRows').innerHTML=runs.map(r=>`<tr class="row" data-r="${r.id}"><td><b class="mono">${esc(r.agent)}</b></td><td>${esc(r.task.slice(0,90))}</td><td><span class="dot ${r.status}"></span>${r.status}</td><td class="hide-s">${esc(r.mode)}</td><td class="hide-s">${r.startedAt?fmtD(dur(r)):'—'}</td><td class="hide-s" style="color:var(--mute)">${ago(r.createdAt)}</td></tr>`).join('')||'<tr><td colspan=6 class="empty">No runs yet.</td></tr>';
+ document.querySelectorAll('#runRows tr[data-r]').forEach(t=>t.onclick=()=>showRun(t.dataset.r))}
+function render(){nav();kpis();chips();rows();feed();runTable();
+ $('#viewFleet').classList.toggle('hidden',view!=='fleet');$('#viewRuns').classList.toggle('hidden',view!=='runs');
+ $('#title').textContent=view==='runs'?'Run history':(dept==='all'?'Mission Control':cap(dept))}
+// ---- drawer ----
+function drawer(h){const d=$('#drawer');d.innerHTML=h;d.classList.add('open');d.setAttribute('aria-hidden','false')}
+function closeD(){openRun=null;openAgent=null;const d=$('#drawer');d.classList.remove('open');d.setAttribute('aria-hidden','true')}
+async function showAgent(id){openRun=null;openAgent=id;
+ let a;try{a=await api('/agents/'+id)}catch(e){return banner(e.message)}
+ const s=statusOf(id),mine=runs.filter(r=>r.agent===id).slice(0,5);
+ drawer(`<button class="ghost" id="cl" style="float:right">Close</button><h2 class="mono">${esc(a.id)}</h2><div style="color:var(--mute)">${esc(cap(a.dept))} · <span class="dot ${s}"></span>${s}</div><p>${esc(a.desc)}</p><div>${a.tools.map(t=>`<span class="tag mono">${esc(t)}</span>`).join('')}</div>
+ <h3 style="margin-top:18px;font-size:14px">Dispatch to ${esc(a.id)}</h3><textarea id="task" placeholder="Describe the task…"></textarea>
+ <div class="row2"><select id="mode" aria-label="Permission mode"><option value="plan">Read-only (plan)</option><option value="acceptEdits">Allow file edits</option><option value="default">Default permissions</option></select><button class="btn" id="send">Send</button></div><div class="err hidden" id="derr"></div>
+ <h3 style="margin-top:18px;font-size:14px">Recent runs</h3>${mine.map(r=>`<div class="ev" style="cursor:pointer;padding-left:0" data-r="${r.id}"><div><span class="dot ${r.status}"></span>${esc(r.task.slice(0,70))}</div></div>`).join('')||'<div class="empty" style="padding-left:0">None yet.</div>'}
+ <details style="margin-top:16px"><summary style="cursor:pointer;color:var(--mute)">System prompt · ${esc(a.file)}</summary><div class="pre">${esc(a.prompt)}</div></details>`);
+ $('#cl').onclick=closeD;
+ document.querySelectorAll('#drawer .ev[data-r]').forEach(e=>e.onclick=()=>showRun(e.dataset.r));
+ $('#send').onclick=async()=>{const t=$('#task').value.trim();if(!t)return;$('#send').disabled=true;
+  try{const r=await api('/runs',{method:'POST',body:JSON.stringify({agent:id,task:t,mode:$('#mode').value})});await refreshRuns();showRun(r.id)}
+  catch(e){const x=$('#derr');x.textContent=e.message;x.classList.remove('hidden');$('#send').disabled=false}}}
+async function showRun(id){openAgent=null;openRun=id;let r;try{r=await api('/runs/'+id)}catch(e){return banner(e.message)}paintRun(r)}
+function paintRun(r){
+ drawer(`<button class="ghost" id="cl" style="float:right">Close</button><h2 class="mono">${esc(r.agent)}</h2><div style="color:var(--mute)"><span class="dot ${r.status}" id="rdot"></span><span id="rst">${r.status}</span> · ${esc(r.mode)} · <span id="rdur">${r.startedAt?fmtD(dur(r)):'—'}</span>${r.cost?` · $${r.cost.toFixed(3)}`:''}</div>
+ <p style="color:var(--text)">${esc(r.task)}</p><div class="pre" id="out">${esc(r.output||'')}</div>${r.error?`<div class="err">${esc(r.error)}</div>`:''}
+ <div class="row2">${r.status==='running'||r.status==='queued'?'<button class="ghost" id="cancel">Cancel run</button>':''}<button class="ghost" id="ag">View agent</button></div>`);
+ $('#cl').onclick=closeD;$('#ag').onclick=()=>showAgent(r.agent);
+ const c=$('#cancel');if(c)c.onclick=()=>api('/runs/'+r.id+'/cancel',{method:'POST'}).catch(e=>banner(e.message));
+ const o=$('#out');o.scrollTop=o.scrollHeight}
+function banner(m){const b=$('#errbar');b.textContent=m;b.classList.remove('hidden');setTimeout(()=>b.classList.add('hidden'),6000)}
+// ---- data ----
+async function refreshRuns(){runs=await api('/runs');render()}
+function connect(){
+ const es=new EventSource('/api/events'+(TOKEN?'?token='+encodeURIComponent(TOKEN):''));
+ es.onopen=()=>{$('#conndot').className='dot done';$('#conntxt').textContent='live'};
+ es.onerror=()=>{$('#conndot').className='dot failed';$('#conntxt').textContent='reconnecting…'};
+ es.addEventListener('run',e=>{const r=JSON.parse(e.data),i=runs.findIndex(x=>x.id===r.id);
+  if(i>=0)runs[i]={...runs[i],...r};else runs.unshift(r);render();
+  if(openRun===r.id)api('/runs/'+r.id).then(paintRun).catch(()=>{})});
+ es.addEventListener('chunk',e=>{const c=JSON.parse(e.data);if(openRun===c.id){const o=$('#out');if(o){o.textContent+=c.text;o.scrollTop=o.scrollHeight}}});
+}
+async function init(){
+ try{[agents,runs]=await Promise.all([api('/agents'),api('/runs')])}catch(e){banner(e.message)}
+ render();connect();
+ setInterval(()=>{kpis();rows();feed();if(openRun){const r=runs.find(x=>x.id===openRun);if(r&&r.status==='running'&&$('#rdur'))$('#rdur').textContent=fmtD(dur(r))}},5000);
+ setInterval(()=>api('/agents').then(a=>{if(JSON.stringify(a)!==JSON.stringify(agents)){agents=a;render()}}).catch(()=>{}),15000);
+}
+$('#q').oninput=e=>{q=e.target.value.toLowerCase();if(view!=='fleet'){view='fleet'}render()};
+document.addEventListener('keydown',e=>{const t=document.activeElement.tagName;if(e.key==='/'&&t!=='INPUT'&&t!=='TEXTAREA'){e.preventDefault();$('#q').focus()}if(e.key==='Escape')closeD()});
+$('#dispatchTop').onclick=()=>{drawer(`<button class="ghost" id="cl" style="float:right">Close</button><h2>Dispatch a task</h2><p>Choose the agent to send it to.</p><select id="pick" style="width:100%" aria-label="Agent">${agents.map(a=>`<option value="${esc(a.id)}">${esc(a.id)} — ${esc(cap(a.dept))}</option>`).join('')}</select><div class="row2" style="margin-top:12px"><button class="btn" id="go">Continue</button></div>`);
+ $('#cl').onclick=closeD;$('#go').onclick=()=>{showAgent($('#pick').value).then(()=>$('#task')&&$('#task').focus())}};
+$('#theme').onclick=()=>{const r=document.documentElement;const dark=getComputedStyle(r).getPropertyValue('--bg').trim()==='#0b0e14';r.dataset.theme=dark?'light':'dark'};
+init();
+</script>
+</body>
+</html>

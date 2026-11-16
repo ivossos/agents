@@ -1,0 +1,8 @@
+{
+  "name": "agents-control-center",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Control center for the Claude agents in this repository",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" }
+}
