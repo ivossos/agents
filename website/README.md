@@ -31,6 +31,7 @@ Ready-made real-world examples are in `examples/workflows/` (`pre-release-qualit
 
 ## Safety defaults
 - Binds to `127.0.0.1` and rejects non-local `Host` and cross-site `Origin` requests.
+- Each run is its own process group: timeout or **Cancel** stops the whole tree (SIGTERM, then SIGKILL), so a hung agent can't hold a slot. A timed-out run shows as failed with the reason.
 - Tasks default to **Read-only (plan)** permission mode; file edits must be chosen per run.
 - Set `CONTROL_TOKEN` to require a bearer token (open the UI with `?token=...`) if you expose it beyond localhost (`HOST=0.0.0.0 ALLOW_ANY_HOST=1`).
 
@@ -41,6 +42,9 @@ Ready-made real-world examples are in `examples/workflows/` (`pre-release-qualit
 | `AGENTS_DIR` | repo root | Where agent folders live |
 | `WORKDIR` | `AGENTS_DIR` | Directory agents run in |
 | `MAX_PARALLEL` | `4` | Concurrent runs; extra runs queue |
+| `RUN_TIMEOUT_MIN` | `15` | Stop a run (and everything it spawned) after this many minutes; `0` disables |
+| `MAX_OUTPUT_KB` | `256` | Max output kept/streamed per run; the rest is dropped with a visible marker |
+| `KILL_GRACE_MS` | `5000` | Time between SIGTERM and SIGKILL when stopping a run |
 | `CLAUDE_BIN` | `claude` | CLI binary |
 | `CONTROL_TOKEN` | – | Optional bearer token |
 

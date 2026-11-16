@@ -167,7 +167,7 @@ async function showAgent(id){openRun=null;openAgent=id;
 async function showRun(id){openAgent=null;openRun=id;let r;try{r=await api('/runs/'+id)}catch(e){return banner(e.message)}paintRun(r)}
 function paintRun(r){
  drawer(`<button class="ghost" id="cl" style="float:right">Close</button><h2 class="mono">${esc(r.agent)}</h2><div style="color:var(--mute)"><span class="dot ${r.status}" id="rdot"></span><span id="rst">${r.status}</span> · ${esc(r.mode)} · <span id="rdur">${r.startedAt?fmtD(dur(r)):'—'}</span>${r.cost?` · $${r.cost.toFixed(3)}`:''}</div>
- <p style="color:var(--text)">${esc(r.task)}</p><div class="pre" id="out">${esc(r.output||'')}</div>${r.error?`<div class="err">${esc(r.error)}</div>`:''}
+ <p style="color:var(--text)">${esc(r.task)}</p><div class="pre" id="out">${esc(r.output||'')}</div>${r.error?`<div class="err">${esc(r.error)}</div>`:''}${r.truncated?'<div class="conn">Output was truncated at the size limit.</div>':''}
  <div class="row2">${r.status==='running'||r.status==='queued'?'<button class="ghost" id="cancel">Cancel run</button>':''}<button class="ghost" id="ag">View agent</button></div>`);
  $('#cl').onclick=closeD;$('#ag').onclick=()=>showAgent(r.agent);
  const c=$('#cancel');if(c)c.onclick=()=>api('/runs/'+r.id+'/cancel',{method:'POST'}).catch(e=>banner(e.message));
@@ -178,7 +178,7 @@ async function refreshRuns(){runs=await api('/runs');render()}
 function connect(){
  const es=new EventSource('/api/events'+(TOKEN?'?token='+encodeURIComponent(TOKEN):''));
  window.es=es;window.dispatchEvent(new CustomEvent('es',{detail:es}));
- es.onopen=()=>{$('#conndot').className='dot done';$('#conntxt').textContent='live'};
+ es.onopen=()=>{$('#conndot').className='dot done';$('#conntxt').textContent='live';api('/config').then(c=>{$('#conntxt').title=`Runs stop after ${c.runTimeoutMs?Math.round(c.runTimeoutMs/60000*10)/10+' min':'∞'}; output capped at ${c.maxOutputKb} KB; ${c.maxParallel} in parallel`}).catch(()=>{})};
  es.onerror=()=>{$('#conndot').className='dot failed';$('#conntxt').textContent='reconnecting…'};
  es.addEventListener('run',e=>{const r=JSON.parse(e.data),i=runs.findIndex(x=>x.id===r.id);
   if(i>=0)runs[i]={...runs[i],...r};else runs.unshift(r);render();

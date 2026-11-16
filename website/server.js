@@ -11,6 +11,10 @@ const REPO = path.resolve(process.env.AGENTS_DIR || path.join(__dirname, '..'));
 const WORKDIR = path.resolve(process.env.WORKDIR || REPO); // where agents run
 const CLAUDE = process.env.CLAUDE_BIN || 'claude';
 const MAX_PARALLEL = +process.env.MAX_PARALLEL || 4;
+const RUN_TIMEOUT_MS = Math.round((process.env.RUN_TIMEOUT_MIN !== undefined ? +process.env.RUN_TIMEOUT_MIN : 15) * 60000); // 0 disables
+const MAX_OUTPUT = Math.round((+process.env.MAX_OUTPUT_KB || 256) * 1024);   // stored/streamed chars per run
+const KILL_GRACE_MS = +process.env.KILL_GRACE_MS || 5000;                    // SIGTERM → SIGKILL
+const MAX_LINE = 8 * 1024 * 1024, MAX_PROMPT = 100000;
 const TOKEN = process.env.CONTROL_TOKEN || '';          // optional bearer token
 const DATA = path.join(__dirname, 'data', 'runs.json');
 const PUB = path.join(__dirname, 'public');
@@ -51,11 +55,11 @@ let runs = [];
 try { runs = JSON.parse(fs.readFileSync(DATA, 'utf8')); } catch {}
 // Runs that were live when the server last stopped can't still be running.
 runs.forEach(r => { if (r.status === 'running' || r.status === 'queued') { r.status = 'failed'; r.error = 'Server restarted'; r.endedAt = Date.now(); } });
-const procs = new Map(), queue = [], waiters = new Map();
+const procs = new Map(), queue = [], waiters = new Map(), timers = new Map(); // timers kept off the run objects (they get serialised)
 let saveT;
 const save = () => { clearTimeout(saveT); saveT = setTimeout(() => {
   fs.mkdirSync(path.dirname(DATA), { recursive: true });
-  fs.writeFileSync(DATA + '.tmp', JSON.stringify(runs.slice(-500))); fs.renameSync(DATA + '.tmp', DATA); }, 200); };
+  fs.writeFileSync(DATA + '.tmp', JSON.stringify(runs.slice(-500), (k, v) => (k === 'output' || k === 'final') && typeof v === 'string' ? v.slice(0, 100000) : v)); fs.renameSync(DATA + '.tmp', DATA); }, 200); };
 const clients = new Set();
 const emit = (type, data) => { const s = `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`; clients.forEach(c => c.write(s)); };
 const brief = r => ({ ...r, output: undefined, final: undefined, outputLen: (r.output || '').length });
@@ -75,34 +79,57 @@ function start(run) {
   if (agent.tools.length) args.push('--allowedTools', agent.tools.join(','));
   run.status = 'running'; run.startedAt = Date.now(); emit('run', brief(run));
   let child;
-  try { child = spawn(CLAUDE, args, { cwd: WORKDIR, stdio: ['ignore', 'pipe', 'pipe'], env: childEnv() }); }
+  try { child = spawn(CLAUDE, args, { cwd: WORKDIR, stdio: ['ignore', 'pipe', 'pipe'], env: childEnv(), detached: true }); } // own process group so the whole tree can be killed
   catch (e) { return finish(run, 'failed', e.message); }
   procs.set(run.id, child);
+  if (RUN_TIMEOUT_MS > 0) timers.set(run.id, { t: setTimeout(() => { run.timedOut = true; stopRun(run); }, RUN_TIMEOUT_MS) });
   let buf = '', err = '';
   const onLine = line => {
     let j; try { j = JSON.parse(line); } catch { return; }
     if (j.type === 'assistant' && j.message && Array.isArray(j.message.content)) {
       for (const c of j.message.content) {
-        if (c.type === 'text') { run.output += c.text + '\n'; emit('chunk', { id: run.id, text: c.text + '\n' }); }
-        else if (c.type === 'tool_use') { const t = `▸ ${c.name}\n`; run.output += t; emit('chunk', { id: run.id, text: t }); }
+        if (c.type === 'text') append(run, c.text + '\n');
+        else if (c.type === 'tool_use') append(run, `▸ ${c.name}\n`);
       }
     } else if (j.type === 'result') {
-      run.cost = j.total_cost_usd; run.isError = !!j.is_error; if (typeof j.result === 'string') run.final = j.result;
+      run.cost = j.total_cost_usd; run.isError = !!j.is_error; if (typeof j.result === 'string') run.final = j.result.slice(0, MAX_OUTPUT);
       if (j.is_error && j.result) run.error = String(j.result).slice(0, 500);
     }
   };
-  child.stdout.on('data', d => { buf += d; let i; while ((i = buf.indexOf('\n')) >= 0) { onLine(buf.slice(0, i)); buf = buf.slice(i + 1); } });
+  child.stdout.on('data', d => { buf += d; if (buf.length > MAX_LINE) buf = ''; let i; while ((i = buf.indexOf('\n')) >= 0) { onLine(buf.slice(0, i)); buf = buf.slice(i + 1); } });
   child.stderr.on('data', d => { err = (err + d).slice(-2000); });
   child.on('error', e => finish(run, 'failed', e.code === 'ENOENT' ? `'${CLAUDE}' CLI not found` : e.message));
   child.on('close', code => {
     if (buf.trim()) onLine(buf);
     if (run.status === 'cancelled') return finish(run, 'cancelled');
+    if (run.timedOut) return finish(run, 'failed', `Timed out after ${fmtMs(RUN_TIMEOUT_MS)} and was stopped`);
     if (code === 0 && !run.isError) finish(run, 'done');
     else finish(run, 'failed', run.error || err.trim().slice(-500) || `exited with code ${code}`);
   });
 }
+const fmtMs = ms => ms >= 60000 ? +(ms / 60000).toFixed(1) + ' min' : Math.round(ms / 1000) + ' s';
+// Append to a run's output, enforcing the cap (excess is dropped once, with a visible marker).
+function append(run, text) {
+  if (run.truncated) return;
+  const room = MAX_OUTPUT - run.output.length;
+  if (text.length > room) { text = text.slice(0, Math.max(0, room)) + `\n[output truncated at ${Math.round(MAX_OUTPUT / 1024)} KB]\n`; run.truncated = true; }
+  run.output += text; emit('chunk', { id: run.id, text });
+}
+// Stop a running process and everything it spawned: SIGTERM first, SIGKILL if it ignores it.
+function killTree(child, sig) { try { process.kill(-child.pid, sig); } catch { try { child.kill(sig); } catch {} } }
+function stopRun(run) {
+  const child = procs.get(run.id); if (!child) return;
+  killTree(child, 'SIGTERM');
+  const tm = timers.get(run.id) || {}; timers.set(run.id, tm); clearTimeout(tm.t);
+  tm.k = setTimeout(() => {
+    killTree(child, 'SIGKILL');
+    // Safety net: if 'close' still never fires, free the slot anyway.
+    tm.k = setTimeout(() => { if (procs.has(run.id)) finish(run, run.timedOut && run.status !== 'cancelled' ? 'failed' : 'cancelled', run.timedOut ? 'Timed out and was force-killed' : undefined); }, 3000);
+  }, KILL_GRACE_MS);
+}
 function finish(run, status, error) {
   if (run.endedAt && run.status !== 'running') return;
+  const tm = timers.get(run.id); if (tm) { clearTimeout(tm.t); clearTimeout(tm.k); timers.delete(run.id); }
   procs.delete(run.id); run.status = status; run.endedAt = Date.now(); if (error) run.error = error;
   save(); emit('run', brief(run));
   const w = waiters.get(run.id); if (w) { waiters.delete(run.id); w(run); }
@@ -115,7 +142,7 @@ function createRun(agent, task, mode, meta) {
 
 function cancelRun(r) {
   if (r.status === 'queued') { queue.splice(queue.indexOf(r), 1); finish(r, 'cancelled'); }
-  else if (r.status === 'running') { r.status = 'cancelled'; procs.get(r.id)?.kill('SIGTERM'); }
+  else if (r.status === 'running') { r.status = 'cancelled'; stopRun(r); }
 }
 
 // ---------- workflows ----------
@@ -159,6 +186,7 @@ function cleanWorkflow(b, id) {
   return { id, name: b.name.trim(), description: String(b.description || '').slice(0, 300), mode: MODES.includes(b.mode) ? b.mode : 'plan', steps };
 }
 
+const capPrompt = t => t.length > MAX_PROMPT ? t.slice(0, MAX_PROMPT) + '\n\n[truncated: previous output was too long]' : t;
 async function execWf(w) {
   const ctl = { cancelled: false, runId: null }; wfActive.set(w.id, ctl);
   w.status = 'running'; w.startedAt = Date.now(); emitWf(w);
@@ -166,7 +194,7 @@ async function execWf(w) {
   try {
     for (let i = 0; i < w.steps.length && !ctl.cancelled; i++) {
       const st = w.steps[i];
-      const run = createRun(st.agent, tpl(st.prompt, { input: w.input, prev, steps: outs }), w.mode, { wf: w.id, step: i });
+      const run = createRun(st.agent, capPrompt(tpl(st.prompt, { input: w.input, prev, steps: outs })), w.mode, { wf: w.id, step: i });
       st.runId = run.id; st.status = 'running'; st.startedAt = Date.now(); ctl.runId = run.id; emitWf(w);
       const done = run.endedAt ? run : await new Promise(r => waiters.set(run.id, r));
       st.endedAt = Date.now(); st.status = done.status; st.cost = done.cost;
@@ -208,6 +236,7 @@ http.createServer(async (req, res) => {
         res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
         res.write('retry: 2000\n\n'); clients.add(res); req.on('close', () => clients.delete(res)); return;
       }
+      if (p === '/api/config') return json(res, 200, { runTimeoutMs: RUN_TIMEOUT_MS, maxOutputKb: Math.round(MAX_OUTPUT / 1024), maxParallel: MAX_PARALLEL });
       if (p === '/api/agents' && req.method === 'GET') return json(res, 200, loadAgents().map(a => ({ ...a, prompt: undefined })));
       let m;
       if ((m = p.match(/^\/api\/agents\/([\w-]+)$/)) && req.method === 'GET') {
@@ -278,4 +307,5 @@ http.createServer(async (req, res) => {
 
 process.on('unhandledRejection', e => console.error('unhandled rejection:', e));
 process.on('uncaughtException', e => console.error('uncaught exception:', e));
-process.on('SIGINT', () => { procs.forEach(c => c.kill()); process.exit(0); });
+process.on('SIGINT', () => { procs.forEach(c => killTree(c, 'SIGKILL')); process.exit(0); });
+process.on('SIGTERM', () => { procs.forEach(c => killTree(c, 'SIGKILL')); process.exit(0); });
