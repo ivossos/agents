@@ -79,6 +79,7 @@ function start(run) {
   const args = ['-p', run.task, '--agents', JSON.stringify(def), '--agent', agent.id,
     '--output-format', 'stream-json', '--verbose', '--permission-mode', run.mode];
   if (agent.tools.length) args.push('--allowedTools', agent.tools.join(','));
+  if (run.resume) args.push('--resume', run.resume);   // chat: continue the agent's previous session
   run.status = 'running'; run.startedAt = Date.now(); emit('run', brief(run));
   let child;
   try { child = spawn(CLAUDE, args, { cwd: WORKDIR, stdio: ['ignore', 'pipe', 'pipe'], env: childEnv(), detached: true }); } // own process group so the whole tree can be killed
@@ -88,6 +89,7 @@ function start(run) {
   let buf = '', err = '';
   const onLine = line => {
     let j; try { j = JSON.parse(line); } catch { return; }
+    if (j.session_id && run.sessionId !== j.session_id) { run.sessionId = j.session_id; save(); emit('run', brief(run)); }
     if (j.type === 'assistant' && j.message && Array.isArray(j.message.content)) {
       for (const c of j.message.content) {
         if (c.type === 'text') append(run, c.text + '\n');
@@ -263,6 +265,25 @@ http.createServer(async (req, res) => {
       if ((m = p.match(/^\/api\/runs\/(\w+)\/cancel$/)) && req.method === 'POST') {
         const r = runs.find(x => x.id === m[1]); if (!r) return json(res, 404, { error: 'Not found' });
         cancelRun(r); return json(res, 200, brief(r));
+      }
+      // ---- chat: a conversation is a chain of runs that share one Claude session ----
+      if (p === '/api/chat' && req.method === 'POST') {
+        const b = await body(req);
+        if (!loadAgents().some(a => a.id === b.agent)) return json(res, 400, { error: 'Unknown agent' });
+        if (typeof b.message !== 'string' || !b.message.trim()) return json(res, 400, { error: 'Message is required' });
+        if (queueFull()) return busy(res, 'The run queue');
+        const chat = typeof b.chat === 'string' && /^[\w-]{4,40}$/.test(b.chat) ? b.chat : 'c' + crypto.randomBytes(5).toString('hex');
+        const prev = runs.filter(r => r.chat === chat);
+        if (prev.some(r => r.agent !== b.agent)) return json(res, 400, { error: 'This conversation belongs to another agent' });
+        if (prev.some(r => r.status === 'running' || r.status === 'queued')) return json(res, 409, { error: 'The agent is still answering the previous message' });
+        const last = [...prev].reverse().find(r => r.sessionId);
+        const mode = MODES.includes(b.mode) ? b.mode : 'plan';
+        return json(res, 201, brief(createRun(b.agent, b.message.trim().slice(0, 8000), mode, { chat, resume: last ? last.sessionId : undefined })));
+      }
+      if ((m = p.match(/^\/api\/chats\/([\w-]+)$/)) && req.method === 'GET') {
+        const list = runs.filter(r => r.chat === m[1]);
+        if (!list.length) return json(res, 404, { error: 'Not found' });
+        return json(res, 200, { id: m[1], agent: list[0].agent, messages: list.map(r => ({ ...brief(r), output: r.output || '', reply: r.status === 'done' ? outputOf(r) : '' })) });
       }
       if (p === '/api/workflows' && req.method === 'GET') return json(res, 200, workflows);
       if (p === '/api/workflows' && req.method === 'POST') {

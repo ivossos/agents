@@ -70,6 +70,50 @@ select{background:var(--panel2);color:var(--text);border:1px solid var(--line);b
 :root[data-theme="light"] .btn,:root[data-theme="light"] .logo{color:#fff}
 .hidden{display:none}
 .drawer.wide{width:min(760px,100%)}
+
+/* Mission Control — Creative Workspace */
+:root,:root[data-theme="light"]{--bg:#f0edff;--panel:#f8f7ff;--panel2:#e8e4fb;--line:#d4ccef;--text:#1b103e;--mute:#655b8a;--accent:#7138e7;--ok:#16a874;--warn:#c57812;--err:#f34b19;--run:#286cda}
+:root[data-theme="dark"]{--bg:#16112a;--panel:#211a39;--panel2:#30264b;--line:#493d67;--text:#f6f2ff;--mute:#c0b4dc;--accent:#ac83ff;--ok:#50d2a2;--warn:#f5bf58;--err:#ff7654;--run:#79adff}
+body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+.app{grid-template-columns:190px minmax(0,1fr)}
+aside:not(.drawer){background:transparent;border-right:1px solid var(--line)}
+.brand{font-size:16px;color:var(--text)}
+.logo{background:var(--accent);color:white}
+nav a{padding:9px 10px;font-size:13px}
+nav a.on{background:var(--panel2);box-shadow:inset 3px 0 var(--accent);font-weight:700}
+main{padding:36px 40px 24px;display:flex;flex-direction:column;min-height:100vh}
+.top{gap:16px;margin-bottom:30px}
+.top h1{font-size:clamp(26px,3vw,42px);letter-spacing:-.045em;font-weight:800;margin-right:auto}
+.cmd{flex:0 1 400px;min-width:180px;border-radius:12px;background:var(--panel)}
+.btn{background:#fa4b12;color:#fff;border-radius:10px;font-weight:750;padding:11px 16px}
+:root[data-theme="light"] .btn{color:white}
+.ghost{background:transparent}
+.kpis{grid-template-columns:repeat(5,minmax(0,1fr));gap:0;margin:0 0 34px}
+.kpi{background:none;border:0;border-left:1px solid var(--line);border-radius:0;padding:4px 18px}
+.kpi:first-child{border-left:0;padding-left:0}.kpi .l{font-size:14px;font-weight:700}.kpi .v{font-size:34px;line-height:1.15;font-weight:800;color:var(--text)}.kpi:nth-child(4) .v,.kpi:nth-child(4) .l{color:var(--err)}.kpi .s{font-size:12px}
+.grid{grid-template-columns:minmax(0,2fr) minmax(250px,1fr);gap:28px;align-items:start;flex:1}
+#viewFleet>.card{border:0;border-radius:0;background:transparent;overflow:visible}
+#viewFleet>.card>header{border:0;padding:0 0 20px;gap:12px;flex-wrap:wrap;font-size:25px;font-weight:800;letter-spacing:-.03em}
+#viewFleet>.card+ .card{border-left:1px solid var(--line);padding-left:28px}
+.chip{background:transparent;color:var(--text);padding:5px 12px;font-size:12px}
+.chip.on{background:var(--accent);border-color:var(--accent);color:white}
+#viewFleet table,#viewFleet tbody{display:block;width:100%}
+#viewFleet thead{display:none}
+#viewFleet tbody{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+#viewFleet tr.row{display:flex;flex-direction:column;justify-content:center;position:relative;min-height:78px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:13px 14px 13px 38px}
+#viewFleet tr.row:hover{background:var(--panel2)}
+#viewFleet tr.row td{padding:0;border:0;background:none}
+#viewFleet tr.row td:nth-child(2),#viewFleet tr.row td:nth-child(4),#viewFleet tr.row td:nth-child(5){display:none}
+#viewFleet tr.row td:first-child{font-size:15px;overflow-wrap:anywhere}
+#viewFleet tr.row td:first-child b{font-family:inherit}
+#viewFleet tr.row td:nth-child(3){color:var(--mute)}
+#viewFleet tr.row td:nth-child(3) .dot{position:absolute;left:17px;top:23px;width:10px;height:10px}
+.feed{max-height:65vh}.ev{background:transparent;padding:12px 0;border-bottom:1px solid var(--line)}.ev b{font-family:inherit}.ev time{font-family:inherit}
+footer{margin-top:40px;padding-top:20px;border-top:1px solid var(--line);text-align:right;color:var(--mute);font-size:12px}
+@media(max-width:1050px){.app{grid-template-columns:1fr}aside:not(.drawer){display:block;position:static;height:auto;padding:8px 16px;border-right:0;border-bottom:1px solid var(--line)}aside:not(.drawer) .brand,aside:not(.drawer) .conn,nav .h,nav a[data-d]:not([data-d="all"]){display:none}nav{display:flex;gap:4px}nav a{white-space:nowrap}main{padding:22px}}
+@media(max-width:720px){.top{gap:10px}.top h1{width:100%}.cmd{flex:1 1 100%}.kpis{grid-template-columns:repeat(3,1fr);row-gap:18px}.kpi:nth-child(4){border-left:0;padding-left:0}.grid{grid-template-columns:1fr}#viewFleet>.card+ .card{border-left:0;border-top:1px solid var(--line);padding:22px 0 0}.feed{max-height:360px}#viewFleet tbody{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:420px){#viewFleet tbody{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}.kpi:nth-child(3),.kpi:nth-child(5){border-left:0;padding-left:0}.kpi:nth-child(4){border-left:1px solid var(--line);padding-left:18px}}
+
 </style>
 <script>try{document.documentElement.dataset.theme=localStorage.getItem('theme')||'light'}catch(e){document.documentElement.dataset.theme='light'}</script>
 </head>
@@ -104,6 +148,7 @@ select{background:var(--panel2);color:var(--text);border:1px solid var(--line);b
     <header><span>Run history</span></header>
     <div style="overflow:auto"><table><thead><tr><th>Agent</th><th>Task</th><th>Status</th><th class="hide-s">Mode</th><th class="hide-s">Duration</th><th class="hide-s">Started</th></tr></thead><tbody id="runRows"></tbody></table></div>
   </section>
+  <footer>By EPM Copilot — All rights reserved</footer>
 </main>
 </div>
 <aside class="drawer" id="drawer" aria-hidden="true"></aside>
@@ -150,21 +195,22 @@ function render(){nav();kpis();chips();rows();feed();runTable();
  $('#title').textContent=view==='workflows'?'Workflows':view==='runs'?'Run history':(dept==='all'?'Mission Control':cap(dept))}
 // ---- drawer ----
 function drawer(h){const d=$('#drawer');d.innerHTML=h;d.classList.add('open');d.setAttribute('aria-hidden','false')}
-function closeD(){document.querySelector('#drawer').classList.remove('wide');window.wfClosed&&wfClosed();openRun=null;openAgent=null;const d=$('#drawer');d.classList.remove('open');d.setAttribute('aria-hidden','true')}
-async function showAgent(id){openRun=null;openAgent=id;
+function closeD(){document.querySelector('#drawer').classList.remove('wide');window.wfClosed&&wfClosed();window.chatClosed&&chatClosed();openRun=null;openAgent=null;const d=$('#drawer');d.classList.remove('open');d.setAttribute('aria-hidden','true')}
+async function showAgent(id){window.chatClosed&&chatClosed();$('#drawer').classList.remove('wide');openRun=null;openAgent=id;
  let a;try{a=await api('/agents/'+id)}catch(e){return banner(e.message)}
  const s=statusOf(id),mine=runs.filter(r=>r.agent===id).slice(0,5);
  drawer(`<button class="ghost" id="cl" style="float:right">Close</button><h2 class="mono">${esc(a.id)}</h2><div style="color:var(--mute)">${esc(cap(a.dept))} · <span class="dot ${s}"></span>${s}</div><p>${esc(a.desc)}</p><div>${a.tools.map(t=>`<span class="tag mono">${esc(t)}</span>`).join('')}</div>
+ <div class="row2" style="margin-top:14px"><button class="btn" id="chatBtn">💬 Chat with ${esc(a.id)}</button></div>
  <h3 style="margin-top:18px;font-size:14px">Dispatch to ${esc(a.id)}</h3><textarea id="task" placeholder="Describe the task…"></textarea>
  <div class="row2"><select id="mode" aria-label="Permission mode"><option value="plan">Read-only (plan)</option><option value="acceptEdits">Allow file edits</option><option value="default">Default permissions</option></select><button class="btn" id="send">Send</button></div><div class="err hidden" id="derr"></div>
  <h3 style="margin-top:18px;font-size:14px">Recent runs</h3>${mine.map(r=>`<div class="ev" style="cursor:pointer;padding-left:0" data-r="${r.id}"><div><span class="dot ${r.status}"></span>${esc(r.task.slice(0,70))}</div></div>`).join('')||'<div class="empty" style="padding-left:0">None yet.</div>'}
  <details style="margin-top:16px"><summary style="cursor:pointer;color:var(--mute)">System prompt · ${esc(a.file)}</summary><div class="pre">${esc(a.prompt)}</div></details>`);
- $('#cl').onclick=closeD;
+ $('#cl').onclick=closeD;$('#chatBtn').onclick=()=>openChat(id);
  document.querySelectorAll('#drawer .ev[data-r]').forEach(e=>e.onclick=()=>showRun(e.dataset.r));
  $('#send').onclick=async()=>{const t=$('#task').value.trim();if(!t)return;$('#send').disabled=true;
   try{const r=await api('/runs',{method:'POST',body:JSON.stringify({agent:id,task:t,mode:$('#mode').value})});await refreshRuns();showRun(r.id)}
   catch(e){const x=$('#derr');x.textContent=e.message;x.classList.remove('hidden');$('#send').disabled=false}}}
-async function showRun(id){openAgent=null;openRun=id;let r;try{r=await api('/runs/'+id)}catch(e){return banner(e.message)}paintRun(r)}
+async function showRun(id){window.chatClosed&&chatClosed();$('#drawer').classList.remove('wide');openAgent=null;openRun=id;let r;try{r=await api('/runs/'+id)}catch(e){return banner(e.message)}paintRun(r)}
 function paintRun(r){
  drawer(`<button class="ghost" id="cl" style="float:right">Close</button><h2 class="mono">${esc(r.agent)}</h2><div style="color:var(--mute)"><span class="dot ${r.status}" id="rdot"></span><span id="rst">${r.status}</span> · ${esc(r.mode)} · <span id="rdur">${r.startedAt?fmtD(dur(r)):'—'}</span>${r.cost?` · $${r.cost.toFixed(3)}`:''}</div>
  <p style="color:var(--text)">${esc(r.task)}</p><div class="pre" id="out">${esc(r.output||'')}</div>${r.error?`<div class="err">${esc(r.error)}</div>`:''}${r.truncated?'<div class="conn">Output was truncated at the size limit.</div>':''}
@@ -195,9 +241,10 @@ $('#q').oninput=e=>{q=e.target.value.toLowerCase();if(view!=='fleet'){view='flee
 document.addEventListener('keydown',e=>{const t=document.activeElement.tagName;if(e.key==='/'&&t!=='INPUT'&&t!=='TEXTAREA'){e.preventDefault();$('#q').focus()}if(e.key==='Escape')closeD()});
 $('#dispatchTop').onclick=()=>{drawer(`<button class="ghost" id="cl" style="float:right">Close</button><h2>Dispatch a task</h2><p>Choose the agent to send it to.</p><select id="pick" style="width:100%" aria-label="Agent">${agents.map(a=>`<option value="${esc(a.id)}">${esc(a.id)} — ${esc(cap(a.dept))}</option>`).join('')}</select><div class="row2" style="margin-top:12px"><button class="btn" id="go">Continue</button></div>`);
  $('#cl').onclick=closeD;$('#go').onclick=()=>{showAgent($('#pick').value).then(()=>$('#task')&&$('#task').focus())}};
-$('#theme').onclick=()=>{const r=document.documentElement;const dark=getComputedStyle(r).getPropertyValue('--bg').trim()==='#0b0e14';r.dataset.theme=dark?'light':'dark';try{localStorage.setItem('theme',r.dataset.theme)}catch(e){}};
+$('#theme').onclick=()=>{const r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark';try{localStorage.setItem('theme',r.dataset.theme)}catch(e){}};
 init();
 </script>
 <script src="workflows.js"></script>
+<script src="chat.js"></script>
 </body>
 </html>
