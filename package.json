@@ -1,0 +1,12 @@
+{
+  "name": "agents-control-center",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Control center + agent library for Contains Studio",
+  "scripts": {
+    "start":          "node website/server.js",
+    "test":           "node scripts/test-agent-parser.js",
+    "build:showcase": "node scripts/build-showcase.js"
+  },
+  "engines": { "node": ">=18" }
+}

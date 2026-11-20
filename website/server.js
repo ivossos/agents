@@ -24,33 +24,9 @@ const SKIP = new Set(['website', 'node_modules']);
 const MODES = ['plan', 'acceptEdits', 'default'];
 
 // ---------- agents ----------
-function parseAgent(file, dept) {
-  const t = fs.readFileSync(file, 'utf8');
-  const m = t.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
-  if (!m) {
-    // No frontmatter: derive the agent from the filename and the markdown body.
-    const para = (t.split(/^## Description\s*$/m)[1] || t).split(/\r?\n/).map(l => l.trim()).find(l => l && !l.startsWith('#'));
-    return { id: path.basename(file, '.md'), dept, desc: (para || '').slice(0, 400), color: 'gray', tools: [], prompt: t.trim(), file: path.relative(REPO, file) };
-  }
-  const fm = {};
-  m[1].split(/\r?\n/).forEach(l => { const k = l.match(/^(\w+):\s*(.*)$/); if (k) fm[k[1]] = k[2]; });
-  if (!fm.name) return null;
-  const desc = (fm.description || '').split(/\\n|\s+Examples:/)[0].trim();
-  return {
-    id: fm.name.trim(), dept, desc, color: (fm.color || 'gray').trim(),
-    tools: fm.tools ? fm.tools.split(',').map(s => s.trim()).filter(Boolean) : [],
-    prompt: m[2].trim(), file: path.relative(REPO, file),
-  };
-}
-function loadAgents() {
-  const out = [];
-  for (const d of fs.readdirSync(REPO, { withFileTypes: true })) {
-    if (!d.isDirectory() || d.name.startsWith('.') || SKIP.has(d.name)) continue;
-    for (const f of fs.readdirSync(path.join(REPO, d.name)))
-      if (f.endsWith('.md')) { try { const a = parseAgent(path.join(REPO, d.name, f), d.name); if (a) out.push(a); } catch {} }
-  }
-  return out.sort((a, b) => a.dept.localeCompare(b.dept) || a.id.localeCompare(b.id));
-}
+// Parsing logic lives in the shared module; this thin wrapper closes over REPO and SKIP.
+const { loadAgents: _loadAgents } = require('../scripts/lib/agent-parser');
+const loadAgents = () => _loadAgents(REPO, SKIP);
 
 // ---------- runs ----------
 let runs = [];
@@ -238,6 +214,8 @@ http.createServer(async (req, res) => {
     if (oh !== req.headers.host) { res.writeHead(403); return res.end('Forbidden origin'); }
   }
   if (p.startsWith('/api/')) {
+    // Health check — always public so load balancers / Railway / Fly can probe without a token.
+    if (p === '/api/health') return json(res, 200, { status: 'ok', agents: loadAgents().length, queued: queue.length, running: procs.size, uptime: Math.floor(process.uptime()) });
     if (TOKEN && req.headers.authorization !== `Bearer ${TOKEN}` && u.searchParams.get('token') !== TOKEN) return json(res, 401, { error: 'Unauthorized' });
     try {
       if (p === '/api/events') {

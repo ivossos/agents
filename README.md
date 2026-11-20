@@ -2,6 +2,63 @@
 
 A comprehensive collection of specialized AI agents designed to accelerate and enhance every aspect of rapid development. Each agent is an expert in their domain, ready to be invoked when their expertise is needed.
 
+## 🌐 Running the Control Center
+
+The `website/` directory contains a zero-dependency Node.js server that lets you dispatch agents, run multi-step workflows, and stream live output — all from a browser UI.
+
+### Local dev (< 1 minute)
+
+```bash
+cd website
+node server.js          # → http://localhost:3000
+```
+
+### Docker (one command)
+
+```bash
+cp .env.example .env    # fill in ANTHROPIC_API_KEY and optionally CONTROL_TOKEN
+docker compose up       # → http://localhost:3000
+```
+
+Run history is persisted in `website/data/` via a bind mount so it survives restarts.
+
+### Deploy to Railway
+
+```bash
+# 1. Install Railway CLI  →  https://docs.railway.app/develop/cli
+railway login
+railway init
+railway up
+
+# 2. Set env vars in the Railway dashboard (or via CLI):
+railway variables set ANTHROPIC_API_KEY=sk-ant-... CONTROL_TOKEN=your-secret ALLOW_ANY_HOST=1
+```
+
+Railway auto-detects the `Dockerfile` and sets `PORT`. The health probe hits `GET /api/health`.
+
+### Deploy to Fly.io
+
+```bash
+fly launch --dockerfile Dockerfile --no-deploy
+fly secrets set ANTHROPIC_API_KEY=sk-ant-... CONTROL_TOKEN=your-secret ALLOW_ANY_HOST=1
+fly deploy
+```
+
+### Key env vars
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORT` | `3000` | Server port |
+| `ANTHROPIC_API_KEY` | — | Required for the `claude` CLI |
+| `CONTROL_TOKEN` | _(none)_ | Bearer token for `/api/*` (leave unset = open) |
+| `ALLOW_ANY_HOST` | _(unset)_ | Set to `1` in cloud deploys to skip localhost-only check |
+| `MAX_PARALLEL` | `4` | Max simultaneous agent runs |
+| `RUN_TIMEOUT_MIN` | `15` | Auto-kill long-running agents |
+
+See `.env.example` for the full list.
+
+---
+
 ## 📥 Installation
 
 1. **Download this repository:**

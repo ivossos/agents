@@ -1,0 +1,10 @@
+# Don't ship runtime state or dev noise into the image
+website/data/
+website/node_modules/
+node_modules/
+.git/
+.env
+.env.*
+!.env.example
+docs/
+*.log

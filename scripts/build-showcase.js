@@ -21,71 +21,16 @@ const SKIP = new Set([
   'scripts', '.git', 'designs', 'video',
 ]);
 
-// ----- agent parsing (mirrors server.js parseAgent) -----
+// ----- agent loading (shared parsing logic lives in scripts/lib/agent-parser.js) -----
 
-/**
- * Parse a single agent markdown file and return a lightweight descriptor.
- * Returns null if the file lacks a recognisable agent definition.
- */
-function parseAgent(file, dept) {
-  const t = fs.readFileSync(file, 'utf8');
-  const m = t.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
-
-  if (!m) {
-    // No YAML frontmatter — derive name from filename, desc from first paragraph.
-    const para = (t.split(/^## Description\s*$/m)[1] || t)
-      .split(/\r?\n/)
-      .map(l => l.trim())
-      .find(l => l && !l.startsWith('#'));
-    return {
-      id:    path.basename(file, '.md'),
-      dept,
-      desc:  (para || '').slice(0, 300),
-      color: 'gray',
-      tools: [],
-    };
-  }
-
-  const fm = {};
-  m[1].split(/\r?\n/).forEach(l => {
-    const k = l.match(/^(\w+):\s*(.*)$/);
-    if (k) fm[k[1]] = k[2];
-  });
-  if (!fm.name) return null;
-
-  // Strip escaped newlines and the Examples: section from the description.
-  const desc = (fm.description || '')
-    .split(/\\n|\s+Examples:/)[0]
-    .trim()
-    .slice(0, 280);
-
-  return {
-    id:    fm.name.trim(),
-    dept,
-    desc,
-    color: (fm.color || 'gray').trim(),
-    tools: fm.tools
-      ? fm.tools.split(',').map(s => s.trim()).filter(Boolean)
-      : [],
-  };
-}
+const { loadAgents: _loadAgents } = require('./lib/agent-parser');
 
 /**
  * Walk the repo root, parse every *.md agent file, return sorted list.
+ * Uses the shared parser; showcase-specific skip set passed explicitly.
  */
 function loadAgents() {
-  const out = [];
-  for (const d of fs.readdirSync(REPO, { withFileTypes: true })) {
-    if (!d.isDirectory() || d.name.startsWith('.') || SKIP.has(d.name)) continue;
-    for (const f of fs.readdirSync(path.join(REPO, d.name))) {
-      if (!f.endsWith('.md')) continue;
-      try {
-        const a = parseAgent(path.join(REPO, d.name, f), d.name);
-        if (a) out.push(a);
-      } catch { /* skip unreadable files */ }
-    }
-  }
-  return out.sort((a, b) => a.dept.localeCompare(b.dept) || a.id.localeCompare(b.id));
+  return _loadAgents(REPO, SKIP);
 }
 
 // ----- color → hex mapping -----

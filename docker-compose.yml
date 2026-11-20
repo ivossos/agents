@@ -1,0 +1,16 @@
+services:
+  control-center:
+    build: .
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file:
+      - .env
+    environment:
+      HOST: "0.0.0.0"
+      ALLOW_ANY_HOST: "1"
+    volumes:
+      # Persist run history between restarts
+      - ./website/data:/app/website/data
+      # Mount the claude CLI auth so the container can make API calls
+      - ${HOME}/.claude:/home/node/.claude:ro
+    restart: unless-stopped
