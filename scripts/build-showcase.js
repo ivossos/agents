@@ -219,6 +219,12 @@ function buildShowcase(agents) {
         A complete team of AI agents covering design, engineering, marketing, product, and operations — ready to run in Claude Code.
       </p>
       <div class="flex flex-col sm:flex-row items-center justify-center gap-3 mt-8">
+        <a href="https://railway.app/new/template?template=https://github.com/ivossos/agents"
+           target="_blank" rel="noopener"
+           class="inline-flex items-center gap-2 bg-[#7B2DFF] text-white font-semibold text-sm px-5 py-2.5 rounded-lg hover:bg-[#6a22e0] transition-colors">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M4.102 2.144C2.37 3.17 1 5.025 1 7.2v9.6c0 2.175 1.37 4.03 3.102 5.056L12 24l7.898-2.144C21.63 20.83 23 18.975 23 16.8V7.2c0-2.175-1.37-4.03-3.102-5.056L12 0 4.102 2.144Z"/></svg>
+          Deploy on Railway
+        </a>
         <a href="https://github.com/ivossos/agents"
            target="_blank" rel="noopener"
            class="inline-flex items-center gap-2 bg-white text-black font-semibold text-sm px-5 py-2.5 rounded-lg hover:bg-zinc-100 transition-colors">

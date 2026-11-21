@@ -1,0 +1,27 @@
+{
+  "format": "agents-control-center.workflow",
+  "version": 1,
+  "workflow": {
+    "name": "wDiscover — LinkedIn: quando a IA deu errado",
+    "description": "Pesquisa casos reais de falhas de IA, valida cada fonte, escreve posts para o LinkedIn e faz a revisão final contra a ficha de fatos.",
+    "mode": "plan",
+    "steps": [
+      {
+        "agent": "trend-researcher",
+        "prompt": "Contexto do cliente (wDiscover) e foco desta rodada:\n{{input}}\n\nTarefa: pesquise na web casos REAIS e documentados em que a inteligência artificial deu errado em empresas, governos ou serviços (2023 em diante), relevantes para o público da wDiscover. Exemplos de tipo: chatbot que deu informação errada a cliente, alucinação em documento jurídico ou relatório, viés em seleção ou crédito, vazamento de dados por uso de IA, automação que gerou prejuízo.\n\nTraga 6 a 8 casos. Para cada um:\n- Título curto\n- Quem (empresa/órgão), quando (data) e onde\n- O que aconteceu, em 2–3 frases factuais\n- Consequência concreta (multa, decisão judicial, recall, prejuízo, retratação)\n- Fontes: no mínimo 2 URLs, de preferência fonte primária (comunicado oficial, decisão judicial, órgão regulador) e veículo reconhecido (Reuters, AP, BBC, Folha, Estadão, Valor, The Verge, etc.)\n\nNão invente nada. Se um detalhe não estiver na fonte, não escreva. Descarte casos que só aparecem em blogs, posts de rede social ou sites sem autoria."
+      },
+      {
+        "agent": "tool-evaluator",
+        "prompt": "Você é o checador de fatos. Abaixo estão casos de \"IA que deu errado\" com fontes. VALIDE CADA FONTE de verdade:\n\n1. Abra cada URL (WebFetch). Ela carrega? É o veículo/órgão que diz ser?\n2. O texto da página confirma exatamente o que foi afirmado (quem, quando, o que, consequência)? Confira nomes, datas e números.\n3. Procure (WebSearch) uma segunda fonte independente e confiável que confirme o caso.\n4. Dê o veredito:\n   - VERIFICADO: 2+ fontes confiáveis e independentes confirmam, sem divergência\n   - PARCIAL: o caso é real, mas algum detalhe estava errado ou sem fonte. Corrija para o que as fontes dizem e marque o que mudou\n   - REPROVADO: fonte não abre, não confirma, é fraca ou o caso não se sustenta. Explique por quê\n\nSaída: uma \"FICHA DE FATOS VERIFICADOS\" contendo SOMENTE os casos VERIFICADO e PARCIAL (já corrigidos). Para cada um: título, fatos confirmados (frases curtas), data, consequência, as URLs validadas com o nome do veículo e a data de publicação. No fim, liste os REPROVADOS com o motivo.\n\nCasos a validar:\n{{prev}}"
+      },
+      {
+        "agent": "content-creator",
+        "prompt": "Escreva posts para o LinkedIn da wDiscover em português do Brasil.\n\nContexto do cliente e foco:\n{{input}}\n\nUse SOMENTE os fatos da ficha verificada abaixo. Não acrescente números, nomes, datas ou detalhes que não estejam nela.\n\nFaça 1 post por caso (no máximo 5, escolha os mais fortes para o público). Cada post:\n- 1ª linha que prende a atenção (sem clickbait e sem exagero)\n- O que aconteceu, em linguagem simples\n- Por que deu errado (só o que as fontes sustentam)\n- A lição prática para empresas que estão adotando IA (governança, validação humana, qualidade de dados, testes, limites de uso)\n- Fechamento leve conectando ao trabalho da wDiscover, sem tom de venda\n- Última linha: \"Fonte:\" com o nome do veículo e a URL\n- 900 a 1.500 caracteres, parágrafos curtos, no máximo 3 hashtags\n- Tom profissional e factual: sem atacar ou ridicularizar empresas ou pessoas\n\nFicha de fatos verificados:\n{{prev}}"
+      },
+      {
+        "agent": "legal-compliance-checker",
+        "prompt": "Revisão final antes de publicar. Compare cada post com a ficha de fatos verificados.\n\nPara cada post:\n1. Toda afirmação (nome, data, número, consequência) está na ficha? Se não estiver, remova ou corrija para o que a ficha diz.\n2. A fonte citada é uma das URLs validadas na ficha?\n3. Há risco de difamação, insinuação sem prova, exposição de pessoas físicas, dados pessoais (LGPD) ou promessa indevida em nome da wDiscover? Ajuste o texto.\n\nSaída:\n- Os posts FINAIS, prontos para publicar (texto completo de cada um)\n- Depois, uma tabela de checagem: post | caso | fonte(s) validada(s) | o que foi alterado na revisão | aprovado (sim/não)\n\nFicha de fatos verificados:\n{{step2}}\n\nPosts para revisar:\n{{prev}}"
+      }
+    ]
+  }
+}

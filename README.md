@@ -2,6 +2,9 @@
 
 A comprehensive collection of specialized AI agents designed to accelerate and enhance every aspect of rapid development. Each agent is an expert in their domain, ready to be invoked when their expertise is needed.
 
+[![Showcase](https://img.shields.io/badge/Showcase-ivossos.github.io%2Fagents-black?style=flat-square&logo=github)](https://ivossos.github.io/agents/)
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/ivossos/agents)
+
 ## 🌐 Running the Control Center
 
 The `website/` directory contains a zero-dependency Node.js server that lets you dispatch agents, run multi-step workflows, and stream live output — all from a browser UI.
